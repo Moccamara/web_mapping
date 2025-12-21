@@ -19,7 +19,7 @@ st.title(APP_TITLE)
 # -----------------------------
 # Folder containing GeoJSON/Shapefile
 # -----------------------------
-FOLDER_PATH = r"D:\Web_Mapping\geo_env\data"
+FOLDER_PATH = Path("data")
 folder = Path(FOLDER_PATH)
 
 # Find first .geojson or .shp file
@@ -298,3 +298,4 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
