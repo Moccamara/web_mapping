@@ -274,15 +274,16 @@ with col_chart:
 import streamlit as st
 from pathlib import Path
 import json
+import subprocess
 import requests
 
-# Dossiers
+# --- Dossiers et fichiers ---
 LOCAL_FOLDER = Path("qgis_project")
 LOCAL_FOLDER.mkdir(exist_ok=True)
 SE_FILE = LOCAL_FOLDER / "se_selected/selected_se.json"
-SE_FILE.parent.mkdir(exist_ok=True)
+SE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-# Télécharger le projet QGZ depuis GitHub si pas présent
+# --- Télécharger le projet QGZ depuis GitHub si nécessaire ---
 QGIS_PROJECT_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/qgis_project/project.qgz"
 QGIS_PROJECT = LOCAL_FOLDER / "project.qgz"
 
@@ -291,9 +292,9 @@ if not QGIS_PROJECT.exists():
     r.raise_for_status()
     QGIS_PROJECT.write_bytes(r.content)
 
-# Bouton Streamlit
-if st.button("🟢 Sauvegarder la sélection et obtenir le projet QGIS"):
-    # Sauvegarder la sélection
+# --- Bouton Streamlit ---
+if st.button("🟢 Sauvegarder la sélection et ouvrir QGIS"):
+    # Sauvegarder la sélection JSON
     selected_info = {
         "region": region_selected,
         "cercle": cercle_selected,
@@ -303,14 +304,18 @@ if st.button("🟢 Sauvegarder la sélection et obtenir le projet QGIS"):
     with open(SE_FILE, "w", encoding="utf-8") as f:
         json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
-    # Proposer le projet QGZ en téléchargement
-    st.download_button(
-        label="📂 Télécharger le projet QGIS",
-        data=QGIS_PROJECT.read_bytes(),
-        file_name=QGIS_PROJECT.name
-    )
+    try:
+        # Chemin vers QGIS installé sur ton PC
+        qgis_path = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\QGIS 3.36.3.exe"  # <-- Vérifie le chemin exact
 
-    st.success("Sélection sauvegardée ✔. Ouvrez le projet QGIS et la macro appliquera le zoom automatiquement.")
+        # Lancer QGIS avec le projet
+        subprocess.Popen([qgis_path, str(QGIS_PROJECT)])
+
+        st.success("QGIS ouvert automatiquement avec la sélection ✔")
+
+    except Exception as e:
+        st.error(f"Erreur lors de l'ouverture de QGIS : {e}")
+
 
 
 
@@ -323,6 +328,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
