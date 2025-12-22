@@ -271,10 +271,14 @@ with col_chart:
 # -----------------------------
 # QGIS Button - Save selection
 # -----------------------------
+import streamlit as st
+from pathlib import Path
+import json
+
 QGIS_PROJECT = Path("qgis_project/project.qgz")
 SE_FILE = Path("qgis_project/se_selected/selected_se.json")
 
-if st.button("🟢 Ouvrir dans QGIS"):
+if st.button("🟢 Sauvegarder la sélection et obtenir QGIS"):
     try:
         # Sauvegarder la sélection
         selected_info = {
@@ -283,21 +287,24 @@ if st.button("🟢 Ouvrir dans QGIS"):
             "commune": commune_selected,
             "idse_new": idse_selected
         }
-
         SE_FILE.parent.mkdir(parents=True, exist_ok=True)
-
         with open(SE_FILE, "w", encoding="utf-8") as f:
             json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
-        # Ouvrir le projet QGIS sur Windows
+        # Proposer le projet QGIS en téléchargement
         if QGIS_PROJECT.exists():
-            os.startfile(QGIS_PROJECT)
-            st.success("Projet QGIS ouvert et sélection envoyée ✔")
+            st.download_button(
+                label="📂 Télécharger le projet QGIS",
+                data=QGIS_PROJECT.read_bytes(),
+                file_name=QGIS_PROJECT.name
+            )
+            st.success("Sélection sauvegardée ✔. Téléchargez le projet QGIS ci-dessus.")
         else:
             st.warning("Le fichier QGIS n'a pas été trouvé.")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
+
 # -----------------------------
 # Footer
 # -----------------------------
@@ -305,6 +312,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
