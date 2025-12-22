@@ -280,17 +280,26 @@ from pathlib import Path
 # QGIS Button - Save selection (LOCAL ONLY)
 # -----------------------------
 
+import os
+import json
+import streamlit as st
+from pathlib import Path
+
+# -----------------------------
+# QGIS Button - OPEN QGZ (LOCAL)
+# -----------------------------
+
 QGIS_PROJECT = Path(r"D:\Web_Mapping\geo_env\qgis_project\project.qgz")
 SE_FILE = Path(r"D:\Web_Mapping\geo_env\qgis_project\se_selected\selected_se.json")
 
-if st.button("🟢 Ouvrir dans QGIS"):
+if st.button("🟢 Ouvrir automatiquement dans QGIS"):
     try:
-        # Vérification projet QGIS
+        # Vérification
         if not QGIS_PROJECT.exists():
             st.error("❌ Projet QGIS introuvable")
             st.stop()
 
-        # Sauvegarde sélection
+        # Sauvegarde sélection pour la macro QGIS
         selected_info = {
             "region": region_selected,
             "cercle": cercle_selected,
@@ -303,10 +312,10 @@ if st.button("🟢 Ouvrir dans QGIS"):
         with open(SE_FILE, "w", encoding="utf-8") as f:
             json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
-        # Ouverture automatique QGIS
-        os.startfile(QGIS_PROJECT)
+        # 🔥 OUVERTURE AUTOMATIQUE DU PROJET QGIS
+        os.startfile(str(QGIS_PROJECT))
 
-        st.success("✅ QGIS ouvert automatiquement avec la sélection")
+        st.success("✅ Projet QGIS ouvert automatiquement (macro exécutée)")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
@@ -324,6 +333,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
