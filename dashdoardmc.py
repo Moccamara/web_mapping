@@ -268,8 +268,8 @@ with col_chart:
 # -----------------------------
 # QGIS Button - Save selection
 # -----------------------------
-QGIS_PROJECT = r"D:\Web_Mapping\geo_env\qgis_project\project.qgz"
-SE_FILE = r"D:\Web_Mapping\geo_env\qgis_project\se_selected\selected_se.json"
+QGIS_PROJECT = "qgis_project\project.qgz"
+SE_FILE = "qgis_project\se_selected\selected_se.json"
 
 if st.button("🟢 Ouvrir dans QGIS"):
     try:
@@ -298,6 +298,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
