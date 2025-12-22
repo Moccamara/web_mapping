@@ -271,39 +271,24 @@ with col_chart:
 # -----------------------------
 # QGIS Button - Save selection
 # -----------------------------
-import streamlit as st
-from pathlib import Path
+# Dans QGIS Python console ou script autonome
 import json
+from qgis.core import QgsProject, QgsVectorLayer
 
-QGIS_PROJECT = Path("qgis_project/project.qgz")
-SE_FILE = Path("qgis_project/se_selected/selected_se.json")
+# Charger le projet
+project = QgsProject.instance()
+project.read('qgis_project/project.qgz')
 
-if st.button("🟢 Sauvegarder la sélection et obtenir QGIS"):
-    try:
-        # Sauvegarder la sélection
-        selected_info = {
-            "region": region_selected,
-            "cercle": cercle_selected,
-            "commune": commune_selected,
-            "idse_new": idse_selected
-        }
-        SE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(SE_FILE, "w", encoding="utf-8") as f:
-            json.dump(selected_info, f, ensure_ascii=False, indent=4)
+# Charger la sélection JSON
+with open('qgis_project/se_selected/selected_se.json') as f:
+    se_data = json.load(f)
 
-        # Proposer le projet QGIS en téléchargement
-        if QGIS_PROJECT.exists():
-            st.download_button(
-                label="📂 Télécharger le projet QGIS",
-                data=QGIS_PROJECT.read_bytes(),
-                file_name=QGIS_PROJECT.name
-            )
-            st.success("Sélection sauvegardée ✔. Téléchargez le projet QGIS ci-dessus.")
-        else:
-            st.warning("Le fichier QGIS n'a pas été trouvé.")
+# Exemple : filtrer une couche par IDSE
+layer = QgsProject.instance().mapLayersByName("IDSE Layer")[0]
+expr = f'"idse_new" = \'{se_data["idse_new"]}\''
+request = QgsFeatureRequest().setFilterExpression(expr)
+layer.selectByExpression(expr)
 
-    except Exception as e:
-        st.error(f"Erreur : {e}")
 
 # -----------------------------
 # Footer
@@ -312,6 +297,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
