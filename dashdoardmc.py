@@ -271,23 +271,47 @@ with col_chart:
 # -----------------------------
 # QGIS Button - Save selection
 # -----------------------------
-# Dans QGIS Python console ou script autonome
+import streamlit as st
 import json
-from qgis.core import QgsProject, QgsVectorLayer
+from pathlib import Path
+import subprocess
+import platform
 
-# Charger le projet
-project = QgsProject.instance()
-project.read('qgis_project/project.qgz')
+QGIS_PROJECT = Path("qgis_project/project.qgz")
+SE_FILE = Path("qgis_project/se_selected/selected_se.json")
+PYQGIS_SCRIPT = Path("qgis_project/load_se.py")
 
-# Charger la sélection JSON
-with open('qgis_project/se_selected/selected_se.json') as f:
-    se_data = json.load(f)
+# Bouton pour sauvegarder la sélection et ouvrir QGIS
+if st.button("🟢 Sauvegarder la sélection et ouvrir QGIS"):
+    try:
+        # Exemple : tes valeurs de sélection depuis le sidebar
+        selected_info = {
+            "region": region_selected,
+            "cercle": cercle_selected,
+            "commune": commune_selected,
+            "idse_new": idse_selected
+        }
 
-# Exemple : filtrer une couche par IDSE
-layer = QgsProject.instance().mapLayersByName("IDSE Layer")[0]
-expr = f'"idse_new" = \'{se_data["idse_new"]}\''
-request = QgsFeatureRequest().setFilterExpression(expr)
-layer.selectByExpression(expr)
+        SE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(SE_FILE, "w", encoding="utf-8") as f:
+            json.dump(selected_info, f, ensure_ascii=False, indent=4)
+
+        # Ouvrir QGIS avec le script PyQGIS
+        qgis_path = r"C:\Program Files\QGIS 3.32\bin\qgis-bin.exe"  # Chemin vers QGIS sur ton PC
+        if QGIS_PROJECT.exists() and PYQGIS_SCRIPT.exists():
+            subprocess.Popen([
+                qgis_path,
+                str(QGIS_PROJECT),
+                "--code", str(PYQGIS_SCRIPT)
+            ])
+            st.success("QGIS ouvert avec la sélection appliquée ✔")
+        else:
+            st.warning("Projet QGIS ou script PyQGIS introuvable.")
+
+    except Exception as e:
+        st.error(f"Erreur : {e}")
+
 
 
 # -----------------------------
@@ -297,6 +321,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
