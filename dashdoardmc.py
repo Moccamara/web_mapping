@@ -306,7 +306,7 @@ if st.button("🟢 Sauvegarder la sélection et ouvrir QGIS"):
 
     try:
         # Chemin vers QGIS installé sur ton PC
-        qgis_path = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\QGIS 3.36.3.exe"  # <-- Vérifie le chemin exact
+        qgis_path = r""C:\Program Files\QGIS 3.36.3\bin\qgis-bin.exe""  # <-- Vérifie le chemin exact
 
         # Lancer QGIS avec le projet
         subprocess.Popen([qgis_path, str(QGIS_PROJECT)])
@@ -328,6 +328,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
