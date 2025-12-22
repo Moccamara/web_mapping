@@ -9,6 +9,9 @@ import json
 import pandas as pd
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
+import platform
+import subprocess
+from pathlib import Path
 
 # -----------------------------
 # App title
@@ -268,8 +271,8 @@ with col_chart:
 # -----------------------------
 # QGIS Button - Save selection
 # -----------------------------
-QGIS_PROJECT = "qgis_project/project.qgz"
-SE_FILE = "qgis_project/se_selected/selected_se.json"
+QGIS_PROJECT = Path("qgis_project/project.qgz")
+SE_FILE = Path("qgis_project/se_selected/selected_se.json")
 
 if st.button("🟢 Ouvrir dans QGIS"):
     try:
@@ -279,18 +282,30 @@ if st.button("🟢 Ouvrir dans QGIS"):
             "commune": commune_selected,
             "idse_new": idse_selected
         }
+        SE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-        os.makedirs(os.path.dirname(SE_FILE), exist_ok=True)
-
+        # Sauvegarder le JSON
         with open(SE_FILE, "w", encoding="utf-8") as f:
             json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
-        os.startfile(QGIS_PROJECT)
-        st.success("Projet QGIS ouvert et sélection envoyée ✔")
+        # Ouvrir QGIS si possible
+        if QGIS_PROJECT.exists():
+            system_name = platform.system()
+            if system_name == "Windows":
+                os.startfile(QGIS_PROJECT)
+                st.success("Projet QGIS ouvert et sélection envoyée ✔")
+            elif system_name == "Darwin":  # macOS
+                subprocess.call(["open", QGIS_PROJECT])
+                st.success("Projet QGIS ouvert sur macOS ✔")
+            else:  # Linux
+                # Assumes 'qgis' is in PATH
+                subprocess.call(["qgis", str(QGIS_PROJECT)])
+                st.success("Projet QGIS ouvert sur Linux ✔")
+        else:
+            st.warning("Le fichier QGIS n'a pas été trouvé.")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
-
 # -----------------------------
 # Footer
 # -----------------------------
@@ -298,6 +313,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
