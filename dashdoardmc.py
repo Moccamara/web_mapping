@@ -286,7 +286,7 @@ import streamlit as st
 from pathlib import Path
 
 # -----------------------------
-# QGIS Button - OPEN QGZ (LOCAL)
+# OPEN QGIS PROJECT AUTOMATICALLY
 # -----------------------------
 
 QGIS_PROJECT = Path(r"D:\Web_Mapping\geo_env\qgis_project\project.qgz")
@@ -294,12 +294,7 @@ SE_FILE = Path(r"D:\Web_Mapping\geo_env\qgis_project\se_selected\selected_se.jso
 
 if st.button("🟢 Ouvrir automatiquement dans QGIS"):
     try:
-        # Vérification
-        if not QGIS_PROJECT.exists():
-            st.error("❌ Projet QGIS introuvable")
-            st.stop()
-
-        # Sauvegarde sélection pour la macro QGIS
+        # Sélection pour la macro QGIS
         selected_info = {
             "region": region_selected,
             "cercle": cercle_selected,
@@ -313,12 +308,13 @@ if st.button("🟢 Ouvrir automatiquement dans QGIS"):
             json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
         # 🔥 OUVERTURE AUTOMATIQUE DU PROJET QGIS
-        os.startfile(str(QGIS_PROJECT))
+        os.startfile(QGIS_PROJECT)
 
-        st.success("✅ Projet QGIS ouvert automatiquement (macro exécutée)")
+        st.success("✅ Projet QGIS ouvert automatiquement")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
+
 
 
 
@@ -333,6 +329,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
