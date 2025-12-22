@@ -276,31 +276,23 @@ SE_FILE = Path("qgis_project/se_selected/selected_se.json")
 
 if st.button("🟢 Ouvrir dans QGIS"):
     try:
+        # Sauvegarder la sélection
         selected_info = {
             "region": region_selected,
             "cercle": cercle_selected,
             "commune": commune_selected,
             "idse_new": idse_selected
         }
+
         SE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-        # Sauvegarder le JSON
         with open(SE_FILE, "w", encoding="utf-8") as f:
             json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
-        # Ouvrir QGIS si possible
+        # Ouvrir le projet QGIS sur Windows
         if QGIS_PROJECT.exists():
-            system_name = platform.system()
-            if system_name == "Windows":
-                os.startfile(QGIS_PROJECT)
-                st.success("Projet QGIS ouvert et sélection envoyée ✔")
-            elif system_name == "Darwin":  # macOS
-                subprocess.call(["open", QGIS_PROJECT])
-                st.success("Projet QGIS ouvert sur macOS ✔")
-            else:  # Linux
-                # Assumes 'qgis' is in PATH
-                subprocess.call(["qgis", str(QGIS_PROJECT)])
-                st.success("Projet QGIS ouvert sur Linux ✔")
+            os.startfile(QGIS_PROJECT)
+            st.success("Projet QGIS ouvert et sélection envoyée ✔")
         else:
             st.warning("Le fichier QGIS n'a pas été trouvé.")
 
@@ -313,6 +305,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
