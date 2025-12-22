@@ -275,16 +275,35 @@ import streamlit as st
 import json
 from pathlib import Path
 import subprocess
-import platform
+import requests
 
-QGIS_PROJECT = Path("qgis_project/project.qgz")
-SE_FILE = Path("qgis_project/se_selected/selected_se.json")
-PYQGIS_SCRIPT = Path("qgis_project/load_se.py")
+# --- Dossiers et fichiers ---
+LOCAL_FOLDER = Path("qgis_project")
+LOCAL_FOLDER.mkdir(exist_ok=True)
 
-# Bouton pour sauvegarder la sélection et ouvrir QGIS
+# URL RAW GitHub pour le projet QGIS et le script PyQGIS
+QGIS_PROJECT_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/qgis_project/project.qgz"
+PYQGIS_SCRIPT_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/qgis_project/load_se.py"
+
+QGIS_PROJECT = LOCAL_FOLDER / "project.qgz"
+PYQGIS_SCRIPT = LOCAL_FOLDER / "load_se.py"
+SE_FILE = LOCAL_FOLDER / "se_selected/selected_se.json"
+SE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+# --- Fonction pour télécharger si nécessaire ---
+def download_file(url, dest_path):
+    if not dest_path.exists():
+        r = requests.get(url)
+        r.raise_for_status()
+        dest_path.write_bytes(r.content)
+
+download_file(QGIS_PROJECT_URL, QGIS_PROJECT)
+download_file(PYQGIS_SCRIPT_URL, PYQGIS_SCRIPT)
+
+# --- Bouton Streamlit ---
 if st.button("🟢 Sauvegarder la sélection et ouvrir QGIS"):
     try:
-        # Exemple : tes valeurs de sélection depuis le sidebar
+        # Tes valeurs de sélection provenant du sidebar
         selected_info = {
             "region": region_selected,
             "cercle": cercle_selected,
@@ -292,25 +311,25 @@ if st.button("🟢 Sauvegarder la sélection et ouvrir QGIS"):
             "idse_new": idse_selected
         }
 
-        SE_FILE.parent.mkdir(parents=True, exist_ok=True)
-
+        # Sauvegarder la sélection JSON
         with open(SE_FILE, "w", encoding="utf-8") as f:
             json.dump(selected_info, f, ensure_ascii=False, indent=4)
 
-        # Ouvrir QGIS avec le script PyQGIS
-        qgis_path = r"C:\Program Files\QGIS 3.32\bin\qgis-bin.exe"  # Chemin vers QGIS sur ton PC
-        if QGIS_PROJECT.exists() and PYQGIS_SCRIPT.exists():
-            subprocess.Popen([
-                qgis_path,
-                str(QGIS_PROJECT),
-                "--code", str(PYQGIS_SCRIPT)
-            ])
-            st.success("QGIS ouvert avec la sélection appliquée ✔")
-        else:
-            st.warning("Projet QGIS ou script PyQGIS introuvable.")
+        # Chemin vers QGIS sur Windows
+        qgis_path = r"C:\Program Files\QGIS 3.32\bin\qgis-bin.exe"
+
+        # Lancer QGIS avec le script PyQGIS
+        subprocess.Popen([
+            qgis_path,
+            str(QGIS_PROJECT),
+            "--code", str(PYQGIS_SCRIPT)
+        ])
+
+        st.success("QGIS ouvert avec la sélection appliquée ✔")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
+
 
 
 
@@ -321,6 +340,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
