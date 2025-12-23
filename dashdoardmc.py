@@ -19,6 +19,28 @@ from pathlib import Path
 APP_TITLE = '**RGPH5 Census Update**'
 st.title(APP_TITLE)
 
+# ---------------------------------------------------------
+# 🔐 PASSWORD AUTHENTICATION
+# ---------------------------------------------------------
+if "auth_ok" not in st.session_state:
+    st.session_state.auth_ok = False
+# Try to get password from secrets, fallback to default
+try:
+    PASSWORD = st.secrets["auth"]["dashboard_password"]
+except Exception:
+    PASSWORD = "mocc2025"
+if not st.session_state.auth_ok:
+    with st.sidebar:
+        st.header("🔐 ID")
+        pwd = st.text_input("Enter Password:", type="password")
+        login_btn = st.button("Login")
+        if login_btn:
+            if pwd == PASSWORD:
+                st.session_state.auth_ok = True
+                st.rerun()  # hide password box after login
+            else:
+                st.error("❌ Incorrect Password")
+    st.stop()
 # -----------------------------
 # Folder containing GeoJSON/Shapefile
 # -----------------------------
@@ -329,6 +351,7 @@ st.markdown("""
 **Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
 Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
 """)
+
 
 
 
