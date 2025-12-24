@@ -87,7 +87,7 @@ if idse_selected != "No filtre":
     gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS) ✅ FIXED
+# CSV UPLOAD (POINTS)
 # =========================================================
 st.sidebar.markdown("### 📥 Import CSV Points")
 csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -97,7 +97,6 @@ if csv_file:
     df_csv = pd.read_csv(csv_file)
 
     if {"LAT", "LON"}.issubset(df_csv.columns):
-        # ✅ FIX: force numeric & drop NaNs
         df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
         df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
         df_csv = df_csv.dropna(subset=["LAT", "LON"])
@@ -112,7 +111,10 @@ if csv_file:
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=15)
+m = folium.Map(
+    location=[(miny + maxy) / 2, (minx + maxx) / 2],
+    zoom_start=15
+)
 
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
@@ -126,8 +128,14 @@ m.fit_bounds([[miny, minx], [maxy, maxx]])
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
-    style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.1},
-    tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
+    style_function=lambda x: {
+        "color": "blue",
+        "weight": 2,
+        "fillOpacity": 0.1
+    },
+    tooltip=folium.GeoJsonTooltip(
+        fields=["idse_new", "pop_se", "pop_se_ct"]
+    )
 ).add_to(m)
 
 if points_gdf is not None:
@@ -150,34 +158,67 @@ folium.LayerControl(collapsed=True).add_to(m)
 col_map, col_chart = st.columns([4, 1])
 
 with col_map:
-    st_folium(m, height=400, width=650)
+    st_folium(m, height=420, width=700)
 
 with col_chart:
+    # ---------------------------
+    # BAR CHART
+    # ---------------------------
     if idse_selected == "No filtre":
-        st.info("Select an IDSE")
+        st.info("Select SE.")
     else:
-        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].melt(
+        st.subheader("📊")
+
+        df_geo_stats = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
+        df_geo_stats["idse_new"] = df_geo_stats["idse_new"].astype(str)
+
+        df_long = df_geo_stats.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
-            # var_name="Type",
-            # value_name="Population"
+            var_name="Variable",
+            value_name="Population"
         )
 
-        df_long["Type"] = df_long["Type"].replace({
+        df_long["Variable"] = df_long["Variable"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
         })
 
-        chart = alt.Chart(df_long).mark_bar().encode(
-            x="idse_new:N",
-            xOffset="Type:N",
-            y="Population:Q",
-            color=alt.Color("Type:N", legend=alt.Legend(orient="right")),
-            tooltip=["Type", "Population"]
-        ).properties(height=120)
+        chart = (
+            alt.Chart(df_long)
+            .mark_bar()
+            .encode(
+                x=alt.X(
+                    "idse_new:N",
+                    title=None,
+                    axis=alt.Axis(
+                        labelAngle=0,
+                        labelFontSize=10,
+                        ticks=False
+                    )
+                ),
+                xOffset="Variable:N",
+                y=alt.Y("Population:Q", title=None),
+                color=alt.Color(
+                    "Variable:N",
+                    title="Type",
+                    legend=alt.Legend(
+                        orient="right",
+                        labelFontSize=10,
+                        titleFontSize=10,
+                        padding=0
+                    )
+                ),
+                tooltip=["idse_new", "Variable", "Population"]
+            )
+            .properties(width=80, height=120)
+        )
 
         st.altair_chart(chart, use_container_width=True)
 
+        # ---------------------------
+        # PIE CHART
+        # ---------------------------
         st.subheader("Sex (M / F)")
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
@@ -186,7 +227,11 @@ with col_chart:
                 f_val = int(pts["Feminin"].sum())
 
                 fig, ax = plt.subplots(figsize=(3, 3))
-                ax.pie([m_val, f_val], labels=["M", "F"], autopct="%1.1f%%")
+                ax.pie(
+                    [m_val, f_val],
+                    labels=["M", "F"],
+                    autopct="%1.1f%%"
+                )
                 st.pyplot(fig)
 
 # =========================================================
@@ -196,4 +241,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
