@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
-import requests
 
 # =========================================================
 # APP CONFIG
@@ -45,7 +44,7 @@ if not st.session_state.auth_ok:
             st.session_state.auth_ok = True
             st.session_state.user_role = USERS[username]["role"]
             st.session_state.username = username
-            st.experimental_rerun()
+            st.success(f"Logged in as {username} ({st.session_state.user_role})")
         else:
             st.error("❌ Invalid username or password")
     st.stop()
@@ -70,6 +69,7 @@ gdf = gdf.rename(columns={
     "idse_new": "idse_new"
 })
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
 for col in ["pop_se", "pop_se_ct"]:
     if col not in gdf.columns:
         gdf[col] = 0
@@ -101,7 +101,6 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 points_csv_path = UPLOAD_DIR / "concession.csv"
 points_geojson_path = UPLOAD_DIR / "concession.geojson"
-GITHUB_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/concession.geojson"
 
 # Admin uploads CSV
 if st.session_state.user_role == "Admin":
@@ -120,18 +119,12 @@ if st.session_state.user_role == "Admin":
                 crs="EPSG:4326"
             )
             points_gdf.to_file(points_geojson_path, driver="GeoJSON")
-else:
-    points_gdf = None
 
 # Load points for all users
 if points_geojson_path.exists():
     points_gdf = gpd.read_file(points_geojson_path)
-elif st.session_state.user_role != "Admin":
-    # Fetch from GitHub if customer and local file missing
-    try:
-        points_gdf = gpd.read_file(GITHUB_GEOJSON_URL)
-    except:
-        points_gdf = None
+else:
+    points_gdf = None
 
 # =========================================================
 # MAP
@@ -147,6 +140,7 @@ folium.TileLayer(
 ).add_to(m)
 
 m.fit_bounds([[miny, minx], [maxy, maxx]])
+
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
@@ -154,6 +148,7 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
+# Add points if exists
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -213,6 +208,17 @@ with col_chart:
                 fig, ax = plt.subplots(figsize=(1, 1))
                 ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()], labels=["M", "F"], autopct="%1.1f%%")
                 st.pyplot(fig)
+
+# =========================================================
+# ADMIN EXPORT
+# =========================================================
+if st.session_state.user_role == "Admin":
+    st.sidebar.markdown("### 💾 Admin Export")
+    export_btn = st.sidebar.button("Export Filtered Data to CSV")
+    if export_btn:
+        export_file = UPLOAD_DIR / f"export_{idse_selected}.csv"
+        gdf_idse.to_csv(export_file, index=False)
+        st.sidebar.success(f"Data exported as {export_file.name}")
 
 # =========================================================
 # FOOTER
