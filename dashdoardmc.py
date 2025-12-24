@@ -16,7 +16,7 @@ from pathlib import Path
 # -----------------------------
 # App title
 # -----------------------------
-APP_TITLE = '**Web Geospatial Entreprise Solution**'
+APP_TITLE = '**Geospatial Entreprise Solution**'
 st.title(APP_TITLE)
 
 # ---------------------------------------------------------
@@ -286,6 +286,7 @@ with col_chart:
 st.markdown("""
 **Project: Geospatial Web Mapping** Developping with Streamlit under Python by **CAMARA, PhD** • © 2025
 """)
+
 
 
 
