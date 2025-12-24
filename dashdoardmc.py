@@ -52,7 +52,7 @@ else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
 # =========================================================
-# LOAD MAIN SPATIAL DATA
+# LOAD MAIN SPATIAL DATA (ROBUST FOR YOUR GEOJSON)
 # =========================================================
 DATA_PATH = Path("data")
 DATA_PATH.mkdir(exist_ok=True)
@@ -64,21 +64,31 @@ if not geo_file:
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
 
-# Normalize and rename columns
+# Normalize column names
 gdf.columns = gdf.columns.str.lower().str.strip()
+
+# Rename to dashboard-standard names
 gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
-    "lcommune": "commune",
-    "idse": "idse_new"
+    "lcommune": "commune"
+    # idse_new already exists → DO NOT rename
 })
 
-# Ensure required columns exist
-for col in ["region", "cercle", "commune", "idse_new", "pop_se", "pop_se_ct"]:
+# Ensure required columns always exist
+required_string_cols = ["region", "cercle", "commune", "idse_new"]
+for col in required_string_cols:
     if col not in gdf.columns:
-        gdf[col] = 0 if col in ["pop_se", "pop_se_ct"] else ""
+        gdf[col] = ""
 
+required_numeric_cols = ["pop_se", "pop_se_ct"]
+for col in required_numeric_cols:
+    if col not in gdf.columns:
+        gdf[col] = 0
+
+# Clean geometry
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -234,3 +244,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
