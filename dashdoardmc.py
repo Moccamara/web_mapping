@@ -52,7 +52,7 @@ else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
 # =========================================================
-# LOAD MAIN SPATIAL DATA
+# LOAD SPATIAL DATA
 # =========================================================
 DATA_PATH = Path("data")
 DATA_PATH.mkdir(exist_ok=True)
@@ -63,22 +63,26 @@ if not geo_file:
     st.stop()
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
-
-# Normalize and rename columns
+# Normalize column names
 gdf.columns = gdf.columns.str.lower().str.strip()
-gdf = gdf.rename(columns={
-    "lregion": "region",
-    "lcercle": "cercle",
-    "lcommune": "commune",
-    "idse": "idse_new"
-})
 
-# Ensure required columns exist
-for col in ["region", "cercle", "commune", "idse_new", "pop_se", "pop_se_ct"]:
+# Safe renaming
+if "lregion" in gdf.columns: gdf = gdf.rename(columns={"lregion": "region"})
+if "lcercle" in gdf.columns: gdf = gdf.rename(columns={"lcercle": "cercle"})
+if "lcommune" in gdf.columns: gdf = gdf.rename(columns={"lcommune": "commune"})
+if "idse_new" not in gdf.columns: gdf["idse_new"] = gdf.index.astype(str)
+
+# Check required columns
+required_cols = ["region", "cercle", "commune", "idse_new"]
+for col in required_cols:
     if col not in gdf.columns:
-        gdf[col] = 0 if col in ["pop_se", "pop_se_ct"] else ""
+        st.error(f"Missing required column: {col}")
+        st.stop()
 
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+for col in ["pop_se", "pop_se_ct"]:
+    if col not in gdf.columns:
+        gdf[col] = 0
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -122,8 +126,6 @@ if st.session_state.user_role == "Admin":
                 crs="EPSG:4326"
             )
             points_gdf.to_file(points_geojson_path, driver="GeoJSON")
-        else:
-            st.warning("CSV must contain 'LAT' and 'LON' columns.")
 
 # Load points for all users
 if points_geojson_path.exists():
@@ -158,7 +160,7 @@ if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
-            radius=3,
+            radius=4,
             color="red",
             fill=True,
             fill_opacity=0.8
@@ -173,7 +175,7 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 col_map, col_chart = st.columns((3, 1), gap="small")
 with col_map:
-    st_folium(m, height=450, use_container_width=True)
+    st_folium(m, height=500, use_container_width=True)
 
 with col_chart:
     if idse_selected == "No filtre":
@@ -205,26 +207,6 @@ with col_chart:
             .properties(height=130)
         )
         st.altair_chart(chart, use_container_width=True)
-
-        st.subheader("👥 Sex (M / F)")
-        if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
-            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-            if not pts.empty:
-                fig, ax = plt.subplots(figsize=(1, 1))
-                ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()],
-                       labels=["M", "F"], autopct="%1.1f%%")
-                st.pyplot(fig)
-
-# =========================================================
-# ADMIN EXPORT
-# =========================================================
-if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 💾 Admin Export")
-    export_btn = st.sidebar.button("Export Filtered Data to CSV")
-    if export_btn:
-        export_file = DATA_PATH / f"export_{idse_selected}.csv"
-        gdf_idse.to_csv(export_file, index=False)
-        st.sidebar.success(f"Data exported as {export_file.name}")
 
 # =========================================================
 # FOOTER
