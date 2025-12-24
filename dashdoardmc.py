@@ -11,8 +11,31 @@ import pandas as pd
 # App config & title
 # -----------------------------
 st.set_page_config(layout="wide")
-st.title("🌍 Web GIS – Spatial")
+st.title("🌍 Geospatial Entreprise Solution")
 
+# ---------------------------------------------------------
+# 🔐 PASSWORD AUTHENTICATION
+# ---------------------------------------------------------
+if "auth_ok" not in st.session_state:
+    st.session_state.auth_ok = False
+# Try to get password from secrets, fallback to default
+try:
+    PASSWORD = st.secrets["auth"]["dashboard_password"]
+except Exception:
+    PASSWORD = "mocc2025"
+if not st.session_state.auth_ok:
+    with st.sidebar:
+        st.header("🔐 ID")
+        pwd = st.text_input("Enter Password:", type="password")
+        login_btn = st.button("Login")
+        if login_btn:
+            if pwd == PASSWORD:
+                st.session_state.auth_ok = True
+                st.rerun()  # hide password box after login
+            else:
+                st.error("❌ Incorrect Password")
+    st.stop()
+    
 # -----------------------------
 # Load spatial data
 # -----------------------------
@@ -205,6 +228,7 @@ st.markdown("""
 **Project:** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
