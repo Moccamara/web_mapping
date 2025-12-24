@@ -168,8 +168,6 @@ Legend
 </summary>
 <div style="background:white;padding:10px;border:2px solid grey;width:200px;">
 <span style="color:blue;">■</span> IDSE Boundary<br>
-📏 Measure distance / area<br>
-✏️ Digitize features
 </div>
 </details>
 </div>
@@ -187,11 +185,111 @@ st.subheader(
 
 st_folium(m, height=380, width=650)
 
+
+# ---------------------------
+    # Bar Chart (GeoJSON)
+    # ---------------------------
+    if idse_selected == "No filter":
+        st.info("Select SE.")
+    else:
+        st.subheader("📊")
+
+        # Prepare data
+        df_geo_stats = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
+        df_geo_stats["idse_new"] = df_geo_stats["idse_new"].astype(str)
+        # Melt to long format
+        df_long = df_geo_stats.melt(
+            id_vars="idse_new",
+            value_vars=["pop_se", "pop_se_ct"],
+            var_name="Variable",
+            value_name="Population"
+        )
+        df_long["Variable"] = df_long["Variable"].replace({
+            "pop_se": "Pop SE",
+            "pop_se_ct": "Pop Actu"
+        })
+        # Bar chart with legend visible
+        chart = (
+            alt.Chart(df_long)
+            .mark_bar()
+            .encode(
+                x=alt.X(
+                    "idse_new:N",
+                    title=None,
+                    axis=alt.Axis(
+                        labelAngle=0,
+                        labelFontSize=10,
+                        ticks=False
+                    )
+                ),
+                xOffset="Variable:N",      # Bars side-by-side
+                y=alt.Y("Population:Q", title=None),
+                color=alt.Color(
+                    "Variable:N",
+                    title="Type",            # Name of legend
+                    legend=alt.Legend(
+                        orient="right",
+                        labelFontSize=10,
+                        titleFontSize=10,
+                        padding=0
+                    )
+                ),
+                tooltip=["idse_new", "Variable", "Population"]
+            )
+            .properties(width=80, height=120)
+        )
+        st.altair_chart(chart, use_container_width=True)
+
+        # ---------------------------
+        # Pie Chart (CSV: Masculin / Feminin)
+        # ---------------------------
+        st.subheader("Sex(M.F)")
+
+        if points_gdf is None:
+            st.warning("Select CSV file.")
+        else:
+            try:
+                points_inside = gpd.sjoin(
+                    points_gdf,
+                    gdf_idse[["idse_new", "geometry"]],
+                    predicate="within",
+                    how="inner"
+                )
+                if points_inside.empty:
+                    st.warning("NO SE selected.")
+                else:
+                    if not all(col in points_inside.columns for col in ["Masculin", "Feminin"]):
+                        st.error("Le CSV doit contenir les colonnes: Masculin, Feminin")
+                    else:
+                        total_masculin = int(points_inside["Masculin"].sum())
+                        total_feminin = int(points_inside["Feminin"].sum())
+                        total_population = total_masculin + total_feminin
+                        labels = ["M", "F"]
+                        values = [total_masculin, total_feminin]
+
+                        fig, ax = plt.subplots(figsize=(3.5, 3.5))
+                        wedges, texts, autotexts = ax.pie(
+                            values,
+                            labels=labels,
+                            autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
+                            textprops={'color': 'white', 'fontsize': 14}
+                        )
+                        st.pyplot(fig)
+
+                        st.markdown(f"""
+                       
+                        - 👨 M: **{total_masculin}**
+                        - 👩 F: **{total_feminin}**
+                        - 👥 Pop: **{total_population}**
+                        """)
+            except Exception as e:
+                st.error(f"Erreur lors du pie chart : {e}")
+
 # =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
-**Project:** Geospatial Enterprise Web Mapping  
-Developed with Streamlit, Folium & GeoPandas  
+**Project:** Geospatial Enterprise Web Mapping Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
