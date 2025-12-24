@@ -23,12 +23,13 @@ USERS = {
 }
 
 # =========================================================
-# SESSION STATE INIT
+# SESSION STATE INITIALIZATION
 # =========================================================
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.user_role = None
     st.session_state.username = None
+    st.session_state.login_attempted = False
 
 # =========================================================
 # LOGIN SIDEBAR
@@ -94,13 +95,12 @@ idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# POINTS UPLOAD & AUTOMATIC GEOJSON
+# POINTS UPLOAD AND SHARED GEOJSON
 # =========================================================
-UPLOAD_DIR = Path(__file__).parent / "uploaded_points"
+UPLOAD_DIR = Path("uploaded_points")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-points_csv_path = UPLOAD_DIR / "concession.csv"
-points_geojson_path = UPLOAD_DIR / "concession.geojson"
+points_csv_path = UPLOAD_DIR / "points.csv"
+points_geojson_path = UPLOAD_DIR / "points.geojson"
 
 # Admin uploads CSV
 if st.session_state.user_role == "Admin":
@@ -109,18 +109,23 @@ if st.session_state.user_role == "Admin":
     if csv_file:
         df_csv = pd.read_csv(csv_file)
         if {"LAT", "LON"}.issubset(df_csv.columns):
+            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
+            
+            # Save CSV
             df_csv.to_csv(points_csv_path, index=False)
-
-            # Convert automatically to GeoJSON
+            
+            # Convert to GeoJSON
             points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
             points_gdf.to_file(points_geojson_path, driver="GeoJSON")
+            st.sidebar.success("CSV uploaded and saved as GeoJSON!")
 
-# Load points for all users
+# Load points for all users (Admin + Customer)
 if points_geojson_path.exists():
     points_gdf = gpd.read_file(points_geojson_path)
 else:
@@ -140,7 +145,6 @@ folium.TileLayer(
 ).add_to(m)
 
 m.fit_bounds([[miny, minx], [maxy, maxx]])
-
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
@@ -148,7 +152,7 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
-# Add points if exists
+# Add points to map if available
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -216,9 +220,9 @@ if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 💾 Admin Export")
     export_btn = st.sidebar.button("Export Filtered Data to CSV")
     if export_btn:
-        export_file = UPLOAD_DIR / f"export_{idse_selected}.csv"
+        export_file = f"export_{idse_selected}.csv"
         gdf_idse.to_csv(export_file, index=False)
-        st.sidebar.success(f"Data exported as {export_file.name}")
+        st.sidebar.success(f"Data exported as {export_file}")
 
 # =========================================================
 # FOOTER
