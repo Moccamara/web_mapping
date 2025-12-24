@@ -52,6 +52,19 @@ commune = st.sidebar.selectbox("Commune", communes)
 
 gdf_f = gdf_c[gdf_c["commune"] == commune]
 
+idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique().tolist())
+idse_selected = st.sidebar.selectbox("IDSE_NEW (optionnal)", idse_list)
+
+# Filter GeoJSON by IDSE_NEW
+gdf_idse = gdf_commune.copy()
+if idse_selected != "No filtre":
+    gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
+
+# Create missing pop columns if needed
+for col in ["pop_se", "pop_se_ct"]:
+    if col not in gdf_idse.columns:
+        gdf_idse[col] = 0
+
 # -----------------------------
 # Map center
 # -----------------------------
@@ -62,7 +75,7 @@ center_lon = (minx + maxx) / 2
 # -----------------------------
 # Create Folium Map
 # -----------------------------
-m = folium.Map(location=[center_lat, center_lon], zoom_start=17)
+m = folium.Map(location=[center_lat, center_lon], zoom_start=5)
 
 # -----------------------------
 # Basemaps
@@ -186,3 +199,4 @@ st.markdown("""
 Developed using Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
