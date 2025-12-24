@@ -159,8 +159,8 @@ with col_chart:
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
-            var_name="Type",
-            value_name="Population"
+            # var_name="Type",
+            # value_name="Population"
         )
 
         df_long["Type"] = df_long["Type"].replace({
@@ -196,3 +196,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
