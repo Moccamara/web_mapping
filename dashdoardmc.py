@@ -85,7 +85,7 @@ center_lon = (minx + maxx) / 2
 # -----------------------------
 # Create Folium map
 # -----------------------------
-m = folium.Map(location=[center_lat, center_lon], zoom_start=8)
+m = folium.Map(location=[center_lat, center_lon], zoom_start=12)
 
 # -----------------------------
 # Basemaps
@@ -209,4 +209,5 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
