@@ -106,7 +106,7 @@ points_csv_path = UPLOAD_DIR / "concession.csv"
 points_geojson_path = UPLOAD_DIR / "concession.geojson"
 
 # GitHub raw URL for shared GeoJSON
-GITHUB_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/concession.geojson"
+GITHUB_GEOJSON_URL = "https://github.com/Moccamara/web_mapping/tree/0c23c2cbdf9b90cd125cd6775694fd3f082d9b88/data/concession.geojson"
 
 # -----------------------------
 # Admin CSV Upload
@@ -253,4 +253,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
