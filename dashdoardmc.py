@@ -11,30 +11,34 @@ import matplotlib.pyplot as plt
 # =========================================================
 # APP CONFIG
 # =========================================================
-st.set_page_config(layout="wide", page_title="Geospatial Enterprise Solution")
+st.set_page_config(layout="wide", page_title="🌍 Geospatial Enterprise Solution")
 st.title("🌍 Geospatial Enterprise Solution")
 
 # =========================================================
-# 🔐 PASSWORD AUTHENTICATION
+# USERS & ROLES
 # =========================================================
+USERS = {
+    "admin": {"password": "admin123", "role": "Admin"},
+    "customer": {"password": "cust2025", "role": "Customer"}
+}
+
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
-
-try:
-    PASSWORD = st.secrets["auth"]["dashboard_password"]
-except Exception:
-    PASSWORD = "mocc2025"
+    st.session_state.user_role = None
 
 if not st.session_state.auth_ok:
     with st.sidebar:
         st.header("🔐 Authentication")
+        username = st.text_input("Username")
         pwd = st.text_input("Password", type="password")
         if st.button("Login"):
-            if pwd == PASSWORD:
+            if username in USERS and pwd == USERS[username]["password"]:
                 st.session_state.auth_ok = True
+                st.session_state.user_role = USERS[username]["role"]
+                st.success(f"Logged in as {st.session_state.user_role}")
                 st.rerun()
             else:
-                st.error("❌ Incorrect password")
+                st.error("❌ Invalid username or password")
     st.stop()
 
 # =========================================================
@@ -85,30 +89,29 @@ idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS)
+# CSV UPLOAD (POINTS) – ADMIN ONLY
 # =========================================================
-st.sidebar.markdown("### 📥 Import CSV Points")
-csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-
 points_gdf = None
-if csv_file:
-    df_csv = pd.read_csv(csv_file)
-    if {"LAT", "LON"}.issubset(df_csv.columns):
-        df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-        df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
-        df_csv = df_csv.dropna(subset=["LAT", "LON"])
-
-        points_gdf = gpd.GeoDataFrame(
-            df_csv,
-            geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
-            crs="EPSG:4326"
-        )
+if st.session_state.user_role == "Admin":
+    st.sidebar.markdown("### 📥 Import CSV Points")
+    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+    if csv_file:
+        df_csv = pd.read_csv(csv_file)
+        if {"LAT", "LON"}.issubset(df_csv.columns):
+            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+            df_csv = df_csv.dropna(subset=["LAT", "LON"])
+            points_gdf = gpd.GeoDataFrame(
+                df_csv,
+                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+                crs="EPSG:4326"
+            )
 
 # =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=19)
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=15)
 
 folium.TileLayer(name="OSM").add_to(m)
 folium.TileLayer(
@@ -122,11 +125,7 @@ m.fit_bounds([[miny, minx], [maxy, maxx]])
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
-    style_function=lambda x: {
-        "color": "blue",
-        "weight": 2,
-        "fillOpacity": 0.15
-    },
+    style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
     tooltip=folium.GeoJsonTooltip(
         fields=["idse_new", "pop_se", "pop_se_ct"],
         aliases=["IDSE", "Pop SE", "Pop Actu"]
@@ -156,24 +155,18 @@ with col_map:
     st_folium(m, height=450, use_container_width=True)
 
 with col_chart:
-    # ---------------------------
-    # BAR CHART
-    # ---------------------------
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
         st.subheader("📊 Population")
-
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
-
         df_long = df_long.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
             var_name="Variable",
             value_name="Population"
         )
-
         df_long["Variable"] = df_long["Variable"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
@@ -186,20 +179,14 @@ with col_chart:
                 x=alt.X("idse_new:N", title=None),
                 xOffset="Variable:N",
                 y=alt.Y("Population:Q", title=None),
-                color=alt.Color(
-                    "Variable:N",
-                    legend=alt.Legend(orient="right", title="Type")
-                ),
+                color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
                 tooltip=["idse_new", "Variable", "Population"]
             )
             .properties(height=130)
         )
-
         st.altair_chart(chart, use_container_width=True)
 
-        # ---------------------------
         # PIE CHART
-        # ---------------------------
         st.subheader("👥 Sex (M / F)")
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
@@ -220,13 +207,5 @@ st.markdown(
     ---
     **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
     **CAMARA, PhD – Geomatics Engineering** © 2025
-    """)
-
-
-
-
-
-
-
-
-
+    """
+)
