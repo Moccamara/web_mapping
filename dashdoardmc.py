@@ -100,6 +100,7 @@ gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_comm
 # =========================================================
 # CSV UPLOAD (POINTS)
 # =========================================================
+if st.session_state.user_role == "Admin":
 st.sidebar.markdown("### 📥 Import CSV Points")
 csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 points_gdf = None
@@ -221,3 +222,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
