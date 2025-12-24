@@ -54,30 +54,21 @@ else:
 # =========================================================
 # LOAD MAIN SPATIAL DATA
 # =========================================================
-DATA_PATH = Path("data")
-DATA_PATH.mkdir(exist_ok=True)
-
-geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
+# -----------------------------
+# Folder containing GeoJSON/Shapefile
+# -----------------------------
+folder = Path("data")
+geo_file = next((f for f in folder.glob("*.geojson")), None)
 if not geo_file:
-    st.error("No GeoJSON or Shapefile found in /data")
+    geo_file = next((f for f in folder.glob("*.shp")), None)
+if not geo_file:
+    st.error("No GeoJSON or Shapefile found in /data folder.")
     st.stop()
-
-gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
-
-# Normalize and rename columns
+gdf = gpd.read_file(geo_file)
 gdf.columns = gdf.columns.str.lower().str.strip()
-gdf = gdf.rename(columns={
-    "lregion": "region",
-    "lcercle": "cercle",
-    "lcommune": "commune",
-    "idse": "idse_new"
-})
-
-# Ensure required columns exist
-for col in ["region", "cercle", "commune", "idse_new", "pop_se", "pop_se_ct"]:
-    if col not in gdf.columns:
-        gdf[col] = 0 if col in ["pop_se", "pop_se_ct"] else ""
-
+rename_map = {"lregion": "region", "lcercle": "cercle", "lcommune": "commune", "idse_new": "idse_new"}
+gdf = gdf.rename(columns=rename_map)
+gdf = gdf.to_crs(epsg=4326)
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
 # =========================================================
@@ -234,4 +225,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
