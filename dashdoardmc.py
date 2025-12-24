@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 # -----------------------------
-# App title
+# App config & title
 # -----------------------------
 st.set_page_config(layout="wide")
 st.title("🌍 QGIS-Inspired Web GIS – Spatial Query Enabled")
@@ -20,7 +20,7 @@ DATA_PATH = Path("data")
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
 
 if not geo_file:
-    st.error("No spatial file found in /data")
+    st.error("No GeoJSON or Shapefile found in /data")
     st.stop()
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
@@ -34,55 +34,58 @@ rename_map = {
 }
 gdf = gdf.rename(columns=rename_map)
 
+# Safety check
+required_cols = ["region", "cercle", "commune", "idse_new"]
+missing = [c for c in required_cols if c not in gdf.columns]
+if missing:
+    st.error(f"Missing columns: {missing}")
+    st.stop()
+
 # -----------------------------
-# Sidebar + LOGO
+# Sidebar + logo
 # -----------------------------
 with st.sidebar:
     st.image("logo/logo_wgv.png", width=200)
-    st.markdown("### Geographical level")
+    st.markdown("### 🗂️ Attribute Query")
 
 # -----------------------------
-# Sidebar filters (Attribute Query)
+# Attribute filtering
 # -----------------------------
-st.sidebar.header("🗂️ Attribute Query")
-
 regions = sorted(gdf["region"].dropna().unique())
 region = st.sidebar.selectbox("Region", regions)
 
 gdf_r = gdf[gdf["region"] == region]
+
 cercles = sorted(gdf_r["cercle"].dropna().unique())
 cercle = st.sidebar.selectbox("Cercle", cercles)
 
 gdf_c = gdf_r[gdf_r["cercle"] == cercle]
+
 communes = sorted(gdf_c["commune"].dropna().unique())
 commune = st.sidebar.selectbox("Commune", communes)
 
 gdf_f = gdf_c[gdf_c["commune"] == commune]
 
-idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique().tolist())
-idse_selected = st.sidebar.selectbox("IDSE_NEW (optionnal)", idse_list)
+idse_list = ["No filtre"] + sorted(
+    gdf_f["idse_new"].dropna().unique().tolist()
+)
+idse_selected = st.sidebar.selectbox("IDSE_NEW (optional)", idse_list)
 
-# Filter GeoJSON by IDSE_NEW
-gdf_idse = gdf_commune.copy()
+gdf_idse = gdf_f.copy()
 if idse_selected != "No filtre":
-    gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
-
-# Create missing pop columns if needed
-for col in ["pop_se", "pop_se_ct"]:
-    if col not in gdf_idse.columns:
-        gdf_idse[col] = 0
+    gdf_idse = gdf_f[gdf_f["idse_new"] == idse_selected]
 
 # -----------------------------
 # Map center
 # -----------------------------
-minx, miny, maxx, maxy = gdf_f.total_bounds
+minx, miny, maxx, maxy = gdf_idse.total_bounds
 center_lat = (miny + maxy) / 2
 center_lon = (minx + maxx) / 2
 
 # -----------------------------
-# Create Folium Map
+# Create Folium map
 # -----------------------------
-m = folium.Map(location=[center_lat, center_lon], zoom_start=5)
+m = folium.Map(location=[center_lat, center_lon], zoom_start=17)
 
 # -----------------------------
 # Basemaps
@@ -97,10 +100,10 @@ folium.TileLayer(
 ).add_to(m)
 
 # -----------------------------
-# Polygon layer
+# Polygon layer (IDSE)
 # -----------------------------
 folium.GeoJson(
-    gdf_f,
+    gdf_idse,
     name="IDSE Polygons",
     style_function=lambda x: {
         "color": "blue",
@@ -134,7 +137,8 @@ Draw(
         "polygon": True,
         "rectangle": True,
         "marker": True,
-        "circle": False
+        "circle": False,
+        "circlemarker": False
     }
 ).add_to(m)
 
@@ -152,11 +156,11 @@ legend_html = """
 <summary style="background:white;padding:6px;border:2px solid grey;cursor:pointer;">
 Legend
 </summary>
-<div style="background:white;padding:10px;border:2px solid grey;width:180px;">
+<div style="background:white;padding:10px;border:2px solid grey;width:200px;">
 <span style="color:blue;">■</span> IDSE Polygon<br>
-📏 Measure Tool<br>
-✏️ Digitize Tool<br>
-🖱️ Click = Spatial Query
+📏 Measure distance / area<br>
+✏️ Digitize features<br>
+🖱️ Click map = Spatial query
 </div>
 </details>
 </div>
@@ -167,10 +171,10 @@ m.get_root().html.add_child(folium.Element(legend_html))
 # Display map
 # -----------------------------
 st.subheader("🗺️ Click on the map to run a spatial query")
-map_data = st_folium(m, height=520, width=1000)
+map_data = st_folium(m, height=520, width=1100)
 
 # -----------------------------
-# SPATIAL QUERY (Map Click)
+# Spatial query (by click)
 # -----------------------------
 st.subheader("📍 Spatial Query Result")
 
@@ -181,12 +185,12 @@ if map_data and map_data.get("last_clicked"):
     clicked_point = Point(lon, lat)
     gdf_point = gpd.GeoDataFrame(geometry=[clicked_point], crs="EPSG:4326")
 
-    intersected = gpd.sjoin(gdf_point, gdf_f, predicate="within")
+    intersected = gpd.sjoin(gdf_point, gdf_idse, predicate="within")
 
     if not intersected.empty:
         row = intersected.iloc[0]
         st.success("IDSE Found ✔")
-        st.write({
+        st.json({
             "IDSE": row["idse_new"],
             "Commune": row["commune"],
             "Cercle": row["cercle"],
@@ -194,7 +198,6 @@ if map_data and map_data.get("last_clicked"):
         })
     else:
         st.warning("No IDSE polygon at this location")
-
 else:
     st.info("Click anywhere on the map to identify spatial features")
 
@@ -203,8 +206,6 @@ else:
 # -----------------------------
 st.markdown("""
 **Project:** QGIS-Inspired Web GIS with Spatial Query  
-Developed using Streamlit, Folium & GeoPandas  
+Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
