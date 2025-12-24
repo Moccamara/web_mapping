@@ -98,24 +98,23 @@ idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS)
+# CSV UPLOAD (POINTS) - only Admin
 # =========================================================
-if st.session_state.user_role == "Admin":
-st.sidebar.markdown("### 📥 Import CSV Points")
-csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 points_gdf = None
-if csv_file:
-    df_csv = pd.read_csv(csv_file)
-    if {"LAT", "LON"}.issubset(df_csv.columns):
-        df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-        df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
-        df_csv = df_csv.dropna(subset=["LAT", "LON"])
-        points_gdf = gpd.GeoDataFrame(
-            df_csv,
-            geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
-            crs="EPSG:4326"
-        )
-
+if st.session_state.user_role == "Admin":
+    st.sidebar.markdown("### 📥 Import CSV Points")
+    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+    if csv_file:
+        df_csv = pd.read_csv(csv_file)
+        if {"LAT", "LON"}.issubset(df_csv.columns):
+            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+            df_csv = df_csv.dropna(subset=["LAT", "LON"])
+            points_gdf = gpd.GeoDataFrame(
+                df_csv,
+                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+                crs="EPSG:4326"
+            )
 # =========================================================
 # MAP
 # =========================================================
@@ -222,4 +221,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
