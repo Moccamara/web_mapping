@@ -195,27 +195,6 @@ with col_chart:
                 st.pyplot(fig)
 
 # =========================================================
-# ADMIN EXPORT
-# =========================================================
-if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 💾 Admin Export")
-    export_btn = st.sidebar.button("Export Filtered Data to CSV")
-
-    if export_btn:
-        # Get the local Downloads folder path
-        downloads_path = Path.home() / "Downloads"
-        downloads_path.mkdir(parents=True, exist_ok=True)  # make sure it exists
-
-        # Define the export file path
-        export_file = downloads_path / f"export_{idse_selected}.csv"
-
-        # Save the CSV locally
-        gdf_idse.to_csv(export_file, index=False)
-
-        st.sidebar.success(f"Data exported locally as {export_file}")
-        st.info(f"Check your Downloads folder: {export_file}")
-
-# =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
@@ -223,4 +202,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
