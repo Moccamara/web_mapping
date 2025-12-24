@@ -55,39 +55,66 @@ else:
 # LOAD MAIN SPATIAL DATA
 # =========================================================
 # =========================================================
-# LOAD SE DATA FROM GITHUB (NOT LOCAL)
+# LOAD SE DATA FROM GITHUB (ROBUST)
 # =========================================================
 SE_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
 
 try:
     gdf = gpd.read_file(SE_GEOJSON_URL)
 except Exception as e:
-    st.error("❌ Failed to load SE GeoJSON from GitHub")
+    st.error(f"❌ Failed to load SE GeoJSON from GitHub: {e}")
     st.stop()
 
-# Normalize columns
+# ---------------------------------------------------------
+# Normalize column names
+# ---------------------------------------------------------
 gdf.columns = gdf.columns.str.lower().str.strip()
 
-# Rename to dashboard standard
+# ---------------------------------------------------------
+# Rename known fields to dashboard standard
+# ---------------------------------------------------------
 rename_map = {
     "lregion": "region",
     "lcercle": "cercle",
-    "lcommune": "commune"
+    "lcommune": "commune",
+    "idse": "idse_new",
+    "id_se": "idse_new"
 }
 gdf = gdf.rename(columns=rename_map)
 
-# Ensure required columns exist
-for col in ["region", "cercle", "commune", "idse_new"]:
+# ---------------------------------------------------------
+# Ensure required columns exist (NO KeyError later)
+# ---------------------------------------------------------
+string_cols = ["region", "cercle", "commune", "idse_new"]
+for col in string_cols:
     if col not in gdf.columns:
         gdf[col] = ""
 
-for col in ["pop_se", "pop_se_ct"]:
+numeric_cols = ["pop_se", "pop_se_ct"]
+for col in numeric_cols:
     if col not in gdf.columns:
         gdf[col] = 0
 
-# CRS + geometry cleaning
-gdf = gdf.to_crs(epsg=4326)
+# ---------------------------------------------------------
+# CRS handling (VERY IMPORTANT)
+# ---------------------------------------------------------
+if gdf.crs is None:
+    gdf = gdf.set_crs(epsg=4326)
+else:
+    gdf = gdf.to_crs(epsg=4326)
+
+# ---------------------------------------------------------
+# Geometry cleaning
+# ---------------------------------------------------------
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
+# ---------------------------------------------------------
+# Final safety check
+# ---------------------------------------------------------
+if gdf.empty:
+    st.error("❌ SE GeoJSON loaded but contains no valid geometries.")
+    st.stop()
+
 
 
 # =========================================================
@@ -244,6 +271,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
