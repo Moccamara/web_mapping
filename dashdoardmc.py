@@ -29,22 +29,25 @@ if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.user_role = None
     st.session_state.username = None
+    st.session_state.login_attempted = False
 
 if not st.session_state.auth_ok:
     with st.sidebar:
         st.header("🔐 Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
+        username = st.text_input("Username", key="username_input")
+        password = st.text_input("Password", type="password", key="password_input")
+        login_btn = st.button("Login")
+
+        if login_btn:
+            st.session_state.login_attempted = True
             if username in USERS and USERS[username]["password"] == password:
-                st.session_state.update({
-                    "auth_ok": True,
-                    "user_role": USERS[username]["role"],
-                    "username": username
-                })
-                st.experimental_rerun()
+                st.session_state.auth_ok = True
+                st.session_state.user_role = USERS[username]["role"]
+                st.session_state.username = username
+                st.experimental_rerun()  # safe rerun after state update
             else:
                 st.error("❌ Invalid username or password")
+
     st.stop()
 else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
@@ -157,9 +160,6 @@ with col_map:
     st_folium(m, height=450, use_container_width=True)
 
 with col_chart:
-    # ---------------------------
-    # BAR CHART
-    # ---------------------------
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
@@ -190,9 +190,6 @@ with col_chart:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # ---------------------------
-        # PIE CHART
-        # ---------------------------
         st.subheader("👥 Sex (M / F)")
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
@@ -210,7 +207,8 @@ with col_chart:
 # =========================================================
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 💾 Admin Export")
-    if st.sidebar.button("Export Filtered Data to CSV"):
+    export_btn = st.sidebar.button("Export Filtered Data to CSV")
+    if export_btn:
         export_file = f"export_{idse_selected}.csv"
         gdf_idse.to_csv(export_file, index=False)
         st.sidebar.success(f"Data exported as {export_file}")
@@ -218,11 +216,8 @@ if st.session_state.user_role == "Admin":
 # =========================================================
 # FOOTER
 # =========================================================
-st.markdown(
-    """
-    ---
-    **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
-    **CAMARA, PhD – Geomatics Engineering** © 2025
-    """
-)
-
+st.markdown("""
+---
+**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
+**CAMARA, PhD – Geomatics Engineering** © 2025
+""")
