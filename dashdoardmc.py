@@ -53,9 +53,6 @@ else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
 # =========================================================
-# LOAD SPATIAL DATA
-# =========================================================
-# =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
@@ -128,7 +125,7 @@ if st.session_state.user_role == "Admin":
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=15)
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=18)
 
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
@@ -213,6 +210,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
