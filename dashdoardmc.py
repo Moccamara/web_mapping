@@ -55,6 +55,9 @@ else:
 # =========================================================
 # LOAD SPATIAL DATA
 # =========================================================
+# =========================================================
+# LOAD SPATIAL DATA
+# =========================================================
 DATA_PATH = Path("data")
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
 if not geo_file:
@@ -62,18 +65,33 @@ if not geo_file:
     st.stop()
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
+
+# Lowercase and strip column names
 gdf.columns = gdf.columns.str.lower().str.strip()
+
+# Rename known columns to standard names
 gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
     "lcommune": "commune",
+    "idse": "idse_new",
     "idse_new": "idse_new"
 })
-gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-for col in ["pop_se", "pop_se_ct"]:
+# Ensure required columns exist (fill missing with empty string or 0)
+required_str_cols = ["region", "cercle", "commune", "idse_new"]
+for col in required_str_cols:
+    if col not in gdf.columns:
+        gdf[col] = ""
+
+required_num_cols = ["pop_se", "pop_se_ct"]
+for col in required_num_cols:
     if col not in gdf.columns:
         gdf[col] = 0
+
+# Remove invalid geometries
+gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -202,5 +220,6 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
