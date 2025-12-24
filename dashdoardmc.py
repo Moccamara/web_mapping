@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # =========================================================
 # APP CONFIG
 # =========================================================
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Geospatial Enterprise Solution")
 st.title("🌍 Geospatial Enterprise Solution")
 
 # =========================================================
@@ -50,13 +50,13 @@ if not geo_file:
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
 gdf.columns = gdf.columns.str.lower().str.strip()
 
-rename_map = {
+gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
     "lcommune": "commune",
     "idse_new": "idse_new"
-}
-gdf = gdf.rename(columns=rename_map)
+})
+
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
 for col in ["pop_se", "pop_se_ct"]:
@@ -67,7 +67,7 @@ for col in ["pop_se", "pop_se_ct"]:
 # SIDEBAR FILTERS
 # =========================================================
 with st.sidebar:
-    st.image("logo/logo_wgv.png", width=200)
+    st.image("logo/logo_wgv.png", use_container_width=True)
     st.markdown("### 🗂️ Attribute Query")
 
 region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
@@ -82,9 +82,7 @@ gdf_commune = gdf_c[gdf_c["commune"] == commune]
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 
-gdf_idse = gdf_commune.copy()
-if idse_selected != "No filtre":
-    gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
+gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
 # CSV UPLOAD (POINTS)
@@ -95,7 +93,6 @@ csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 points_gdf = None
 if csv_file:
     df_csv = pd.read_csv(csv_file)
-
     if {"LAT", "LON"}.issubset(df_csv.columns):
         df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
         df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
@@ -111,12 +108,9 @@ if csv_file:
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(
-    location=[(miny + maxy) / 2, (minx + maxx) / 2],
-    zoom_start=15
-)
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=15)
 
-folium.TileLayer("OpenStreetMap").add_to(m)
+folium.TileLayer("OpenStreetMap", name="OSM").add_to(m)
 folium.TileLayer(
     tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     name="Satellite",
@@ -131,10 +125,11 @@ folium.GeoJson(
     style_function=lambda x: {
         "color": "blue",
         "weight": 2,
-        "fillOpacity": 0.1
+        "fillOpacity": 0.15
     },
     tooltip=folium.GeoJsonTooltip(
-        fields=["idse_new", "pop_se", "pop_se_ct"]
+        fields=["idse_new", "pop_se", "pop_se_ct"],
+        aliases=["IDSE", "Pop SE", "Pop Actu"]
     )
 ).add_to(m)
 
@@ -153,12 +148,12 @@ Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 
 # =========================================================
-# LAYOUT
+# LAYOUT (RESPONSIVE)
 # =========================================================
-col_map, col_chart = st.columns([4, 1])
+col_map, col_chart = st.columns((3, 1), gap="small")
 
 with col_map:
-    st_folium(m, height=420, width=700)
+    st_folium(m, height=450, use_container_width=True)
 
 with col_chart:
     # ---------------------------
@@ -167,12 +162,12 @@ with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        st.subheader("📊")
+        st.subheader("📊 Population")
 
-        df_geo_stats = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
-        df_geo_stats["idse_new"] = df_geo_stats["idse_new"].astype(str)
+        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
+        df_long["idse_new"] = df_long["idse_new"].astype(str)
 
-        df_long = df_geo_stats.melt(
+        df_long = df_long.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
             var_name="Variable",
@@ -188,30 +183,16 @@ with col_chart:
             alt.Chart(df_long)
             .mark_bar()
             .encode(
-                x=alt.X(
-                    "idse_new:N",
-                    title=None,
-                    axis=alt.Axis(
-                        labelAngle=0,
-                        labelFontSize=10,
-                        ticks=False
-                    )
-                ),
+                x=alt.X("idse_new:N", title=None),
                 xOffset="Variable:N",
                 y=alt.Y("Population:Q", title=None),
                 color=alt.Color(
                     "Variable:N",
-                    title="Type",
-                    legend=alt.Legend(
-                        orient="right",
-                        labelFontSize=10,
-                        titleFontSize=10,
-                        padding=0
-                    )
+                    legend=alt.Legend(orient="right", title="Type")
                 ),
                 tooltip=["idse_new", "Variable", "Population"]
             )
-            .properties(width=80, height=120)
+            .properties(height=130)
         )
 
         st.altair_chart(chart, use_container_width=True)
@@ -219,16 +200,13 @@ with col_chart:
         # ---------------------------
         # PIE CHART
         # ---------------------------
-        st.subheader("Sex (M / F)")
+        st.subheader("👥 Sex (M / F)")
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
-                m_val = int(pts["Masculin"].sum())
-                f_val = int(pts["Feminin"].sum())
-
                 fig, ax = plt.subplots(figsize=(3, 3))
                 ax.pie(
-                    [m_val, f_val],
+                    [pts["Masculin"].sum(), pts["Feminin"].sum()],
                     labels=["M", "F"],
                     autopct="%1.1f%%"
                 )
@@ -237,7 +215,11 @@ with col_chart:
 # =========================================================
 # FOOTER
 # =========================================================
-st.markdown("""
-**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
-**CAMARA, PhD – Geomatics Engineering** © 2025
-""")
+st.markdown(
+    """
+    ---
+    **Geospatial Enterprise Web Mapping**  
+    Developed with Streamlit, Folium & GeoPandas  
+    **CAMARA, PhD – Geomatics Engineering** © 2025
+    """
+)
