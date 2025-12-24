@@ -59,7 +59,6 @@ rename_map = {
 gdf = gdf.rename(columns=rename_map)
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-# Ensure population fields exist
 for col in ["pop_se", "pop_se_ct"]:
     if col not in gdf.columns:
         gdf[col] = 0
@@ -88,7 +87,7 @@ if idse_selected != "No filtre":
     gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS)
+# CSV UPLOAD (POINTS) ✅ FIXED
 # =========================================================
 st.sidebar.markdown("### 📥 Import CSV Points")
 csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -96,7 +95,13 @@ csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 points_gdf = None
 if csv_file:
     df_csv = pd.read_csv(csv_file)
+
     if {"LAT", "LON"}.issubset(df_csv.columns):
+        # ✅ FIX: force numeric & drop NaNs
+        df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+        df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+        df_csv = df_csv.dropna(subset=["LAT", "LON"])
+
         points_gdf = gpd.GeoDataFrame(
             df_csv,
             geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
@@ -107,7 +112,7 @@ if csv_file:
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny+maxy)/2, (minx+maxx)/2], zoom_start=15)
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=15)
 
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
@@ -131,7 +136,8 @@ if points_gdf is not None:
             location=[r.geometry.y, r.geometry.x],
             radius=3,
             color="red",
-            fill=True
+            fill=True,
+            fill_opacity=0.8
         ).add_to(m)
 
 MeasureControl().add_to(m)
@@ -147,9 +153,6 @@ with col_map:
     st_folium(m, height=400, width=650)
 
 with col_chart:
-    # ---------------------------
-    # BAR CHART
-    # ---------------------------
     if idse_selected == "No filtre":
         st.info("Select an IDSE")
     else:
@@ -175,9 +178,6 @@ with col_chart:
 
         st.altair_chart(chart, use_container_width=True)
 
-        # ---------------------------
-        # PIE CHART
-        # ---------------------------
         st.subheader("Sex (M / F)")
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
