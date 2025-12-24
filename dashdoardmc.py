@@ -69,7 +69,7 @@ if missing:
 # -----------------------------
 with st.sidebar:
     st.image("logo/logo_wgv.png", width=200)
-    st.markdown("### 🗂️ Attribute Query")
+    st.markdown("### Attribute Query")
 
 # -----------------------------
 # Attribute filtering
@@ -228,6 +228,7 @@ st.markdown("""
 **Project:** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
