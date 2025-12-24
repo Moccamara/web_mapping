@@ -96,21 +96,16 @@ gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_comm
 # =========================================================
 # POINTS UPLOAD & AUTOMATIC GEOJSON
 # =========================================================
-import requests
-import tempfile
+# =========================================================
+# POINTS UPLOAD & AUTOMATIC GEOJSON
+# =========================================================
+DATA_PATH = Path("data")
+DATA_PATH.mkdir(exist_ok=True)
 
-# Local upload paths
-UPLOAD_DIR = Path(__file__).parent / "uploaded_points"
-UPLOAD_DIR.mkdir(exist_ok=True)
-points_csv_path = UPLOAD_DIR / "concession.csv"
-points_geojson_path = UPLOAD_DIR / "concession.geojson"
+points_csv_path = DATA_PATH / "concession.csv"
+points_geojson_path = DATA_PATH / "concession.geojson"
 
-# GitHub raw URL for shared GeoJSON
-GITHUB_GEOJSON_URL = "https://github.com/Moccamara/web_mapping/tree/0c23c2cbdf9b90cd125cd6775694fd3f082d9b88/data/concession.geojson"
-
-# -----------------------------
-# Admin CSV Upload
-# -----------------------------
+# Admin uploads CSV
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -128,7 +123,12 @@ if st.session_state.user_role == "Admin":
             )
             points_gdf.to_file(points_geojson_path, driver="GeoJSON")
 
-            # st.sidebar.success("✅ CSV uploaded and converted to GeoJSON locally.")
+# Load points for all users
+if points_geojson_path.exists():
+    points_gdf = gpd.read_file(points_geojson_path)
+else:
+    points_gdf = None
+
 
 # -----------------------------
 # Load points for all users
@@ -253,5 +253,6 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
