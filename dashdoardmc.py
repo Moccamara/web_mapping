@@ -23,13 +23,12 @@ USERS = {
 }
 
 # =========================================================
-# SESSION STATE INITIALIZATION
+# SESSION STATE INIT
 # =========================================================
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.user_role = None
     st.session_state.username = None
-    st.session_state.login_attempted = False
 
 # =========================================================
 # LOGIN SIDEBAR
@@ -95,57 +94,37 @@ idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS) - Admin only, shared with all users
+# POINTS UPLOAD & AUTOMATIC GEOJSON
 # =========================================================
-
-from pathlib import Path
-import pandas as pd
-import geopandas as gpd
-
-# Create folder for uploaded points
-UPLOAD_DIR = Path("uploaded_points")
+UPLOAD_DIR = Path(__file__).parent / "uploaded_points"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-points_csv_path = UPLOAD_DIR / "points.csv"
-points_geojson_path = UPLOAD_DIR / "points.geojson"
+points_csv_path = UPLOAD_DIR / "concession.csv"
+points_geojson_path = UPLOAD_DIR / "concession.geojson"
 
-# ------------------------------
 # Admin uploads CSV
-# ------------------------------
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
     if csv_file:
         df_csv = pd.read_csv(csv_file)
         if {"LAT", "LON"}.issubset(df_csv.columns):
-            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
-            
-            # Save CSV for persistence
             df_csv.to_csv(points_csv_path, index=False)
 
-            # Convert to GeoDataFrame
+            # Convert automatically to GeoJSON
             points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
-
-            # Save as GeoJSON automatically
             points_gdf.to_file(points_geojson_path, driver="GeoJSON")
-            st.sidebar.success("CSV uploaded and saved as GeoJSON!")
 
-# ------------------------------
-# Load points for all users (Admin + Customer)
-# ------------------------------
+# Load points for all users
 if points_geojson_path.exists():
     points_gdf = gpd.read_file(points_geojson_path)
 else:
     points_gdf = None
-
-
-
 
 # =========================================================
 # MAP
@@ -161,6 +140,7 @@ folium.TileLayer(
 ).add_to(m)
 
 m.fit_bounds([[miny, minx], [maxy, maxx]])
+
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
@@ -168,6 +148,7 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
+# Add points if exists
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -229,6 +210,17 @@ with col_chart:
                 st.pyplot(fig)
 
 # =========================================================
+# ADMIN EXPORT
+# =========================================================
+if st.session_state.user_role == "Admin":
+    st.sidebar.markdown("### 💾 Admin Export")
+    export_btn = st.sidebar.button("Export Filtered Data to CSV")
+    if export_btn:
+        export_file = UPLOAD_DIR / f"export_{idse_selected}.csv"
+        gdf_idse.to_csv(export_file, index=False)
+        st.sidebar.success(f"Data exported as {export_file.name}")
+
+# =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
@@ -236,9 +228,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
-
-
-
-
