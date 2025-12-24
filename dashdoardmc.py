@@ -23,13 +23,12 @@ USERS = {
 }
 
 # =========================================================
-# SESSION STATE INITIALIZATION
+# SESSION STATE INIT
 # =========================================================
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.user_role = None
     st.session_state.username = None
-    st.session_state.login_attempted = False
 
 # =========================================================
 # LOGIN SIDEBAR
@@ -53,12 +52,11 @@ else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
 # =========================================================
-# LOAD SPATIAL DATA
-# =========================================================
-# =========================================================
-# LOAD SPATIAL DATA
+# LOAD MAIN SPATIAL DATA
 # =========================================================
 DATA_PATH = Path("data")
+DATA_PATH.mkdir(exist_ok=True)
+
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
 if not geo_file:
     st.error("No GeoJSON or Shapefile found in /data")
@@ -66,32 +64,21 @@ if not geo_file:
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
 
-# Lowercase and strip column names
+# Normalize and rename columns
 gdf.columns = gdf.columns.str.lower().str.strip()
-
-# Rename known columns to standard names
 gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
     "lcommune": "commune",
-    "idse": "idse_new",
-    "idse_new": "idse_new"
+    "idse": "idse_new"
 })
 
-# Ensure required columns exist (fill missing with empty string or 0)
-required_str_cols = ["region", "cercle", "commune", "idse_new"]
-for col in required_str_cols:
+# Ensure required columns exist
+for col in ["region", "cercle", "commune", "idse_new", "pop_se", "pop_se_ct"]:
     if col not in gdf.columns:
-        gdf[col] = ""
+        gdf[col] = 0 if col in ["pop_se", "pop_se_ct"] else ""
 
-required_num_cols = ["pop_se", "pop_se_ct"]
-for col in required_num_cols:
-    if col not in gdf.columns:
-        gdf[col] = 0
-
-# Remove invalid geometries
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
-
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -113,23 +100,36 @@ idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS) - Admin only
+# POINTS UPLOAD & AUTOMATIC GEOJSON
 # =========================================================
-points_gdf = None
+points_csv_path = DATA_PATH / "concession.csv"
+points_geojson_path = DATA_PATH / "concession.geojson"
+
+# Admin uploads CSV
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
     if csv_file:
         df_csv = pd.read_csv(csv_file)
         if {"LAT", "LON"}.issubset(df_csv.columns):
-            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
+            df_csv.to_csv(points_csv_path, index=False)
+
+            # Convert automatically to GeoJSON
             points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
+            points_gdf.to_file(points_geojson_path, driver="GeoJSON")
+        else:
+            st.warning("CSV must contain 'LAT' and 'LON' columns.")
+
+# Load points for all users
+if points_geojson_path.exists():
+    points_gdf = gpd.read_file(points_geojson_path)
+else:
+    points_gdf = None
 
 # =========================================================
 # MAP
@@ -145,6 +145,7 @@ folium.TileLayer(
 ).add_to(m)
 
 m.fit_bounds([[miny, minx], [maxy, maxx]])
+
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
@@ -152,6 +153,7 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
+# Add points if exists
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -209,8 +211,20 @@ with col_chart:
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
                 fig, ax = plt.subplots(figsize=(1, 1))
-                ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()], labels=["M", "F"], autopct="%1.1f%%")
+                ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()],
+                       labels=["M", "F"], autopct="%1.1f%%")
                 st.pyplot(fig)
+
+# =========================================================
+# ADMIN EXPORT
+# =========================================================
+if st.session_state.user_role == "Admin":
+    st.sidebar.markdown("### 💾 Admin Export")
+    export_btn = st.sidebar.button("Export Filtered Data to CSV")
+    if export_btn:
+        export_file = DATA_PATH / f"export_{idse_selected}.csv"
+        gdf_idse.to_csv(export_file, index=False)
+        st.sidebar.success(f"Data exported as {export_file.name}")
 
 # =========================================================
 # FOOTER
@@ -220,6 +234,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
-
