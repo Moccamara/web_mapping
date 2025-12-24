@@ -191,7 +191,7 @@ m.get_root().html.add_child(folium.Element(legend_html))
 # Display map
 # -----------------------------
 # st.subheader("🗺️ Click on the map to run a spatial query")
-map_data = st_folium(m, height=350, width=530)
+map_data = st_folium(m, height=350, width=630)
 
 # -----------------------------
 # Spatial query (by click)
@@ -228,6 +228,7 @@ st.markdown("""
 **Project:** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
