@@ -96,13 +96,21 @@ gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_comm
 # =========================================================
 # POINTS UPLOAD & AUTOMATIC GEOJSON
 # =========================================================
+import requests
+import tempfile
+
+# Local upload paths
 UPLOAD_DIR = Path(__file__).parent / "uploaded_points"
 UPLOAD_DIR.mkdir(exist_ok=True)
-
 points_csv_path = UPLOAD_DIR / "concession.csv"
 points_geojson_path = UPLOAD_DIR / "concession.geojson"
 
-# Admin uploads CSV
+# GitHub raw URL for shared GeoJSON
+GITHUB_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/concession.geojson"
+
+# -----------------------------
+# Admin CSV Upload
+# -----------------------------
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -120,11 +128,28 @@ if st.session_state.user_role == "Admin":
             )
             points_gdf.to_file(points_geojson_path, driver="GeoJSON")
 
+            # st.sidebar.success("✅ CSV uploaded and converted to GeoJSON locally.")
+
+# -----------------------------
 # Load points for all users
+# -----------------------------
+points_gdf = None
+
+# First try local GeoJSON
 if points_geojson_path.exists():
     points_gdf = gpd.read_file(points_geojson_path)
+
+# If local GeoJSON not found, try GitHub
 else:
-    points_gdf = None
+    try:
+        r = requests.get(GITHUB_GEOJSON_URL)
+        r.raise_for_status()
+        temp_path = Path(tempfile.gettempdir()) / "concession.geojson"
+        temp_path.write_bytes(r.content)
+        points_gdf = gpd.read_file(temp_path)
+        st.sidebar.info("🌐 Loaded points from GitHub.")
+    except Exception as e:
+        st.sidebar.warning(f"Could not load points from GitHub: {e}")
 
 # =========================================================
 # MAP
@@ -228,3 +253,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
