@@ -3,310 +3,212 @@ import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
 from pathlib import Path
-import os
-import altair as alt
-import json
 import pandas as pd
-from shapely.geometry import Point
+import json
+import altair as alt
 import matplotlib.pyplot as plt
-import platform
-import subprocess
-from pathlib import Path
+from shapely.geometry import Point
 
 # -----------------------------
 # App title
 # -----------------------------
-APP_TITLE = '**Geospatial Entreprise Solution**'
-st.title(APP_TITLE)
+st.title("🌍 Geospatial Enterprise Solution")
 
 # ---------------------------------------------------------
 # 🔐 PASSWORD AUTHENTICATION
 # ---------------------------------------------------------
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
-# Try to get password from secrets, fallback to default
-try:
-    PASSWORD = st.secrets["auth"]["dashboard_password"]
-except Exception:
-    PASSWORD = "mocc2025"
+
+PASSWORD = st.secrets.get("auth", {}).get("dashboard_password", "mocc2025")
+
 if not st.session_state.auth_ok:
     with st.sidebar:
-        st.header("🔐 ID")
-        pwd = st.text_input("Enter Password:", type="password")
-        login_btn = st.button("Login")
-        if login_btn:
+        st.header("🔐 Login")
+        pwd = st.text_input("Password", type="password")
+        if st.button("Login"):
             if pwd == PASSWORD:
                 st.session_state.auth_ok = True
-                st.rerun()  # hide password box after login
+                st.rerun()
             else:
-                st.error("❌ Incorrect Password")
+                st.error("Incorrect password")
     st.stop()
-# -----------------------------
-# Folder containing GeoJSON/Shapefile
-# -----------------------------
-FOLDER_PATH = Path("data")
-folder = Path(FOLDER_PATH)
 
-# Find first .geojson or .shp file
-geo_file = next((f for f in folder.glob("*.geojson")), None)
+# -----------------------------
+# Load spatial data
+# -----------------------------
+DATA_FOLDER = Path("data")
+geo_file = next(DATA_FOLDER.glob("*.geojson"), None)
 if not geo_file:
-    geo_file = next((f for f in folder.glob("*.shp")), None)
+    geo_file = next(DATA_FOLDER.glob("*.shp"), None)
+
 if not geo_file:
-    st.error("Aucun fichier GeoJSON ou Shapefile trouvé dans le dossier.")
+    st.error("No GeoJSON or Shapefile found.")
     st.stop()
-# Load GeoJSON
-gdf = gpd.read_file(geo_file)
+
+gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
 gdf.columns = gdf.columns.str.lower().str.strip()
 
-# -----------------------------
-# Rename columns
-# -----------------------------
-rename_map = {
+# Rename fields
+gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
     "lcommune": "commune",
     "idse_new": "idse_new"
-}
-gdf = gdf.rename(columns=rename_map)
-gdf = gdf.to_crs(epsg=4326)
-gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+})
 
 # -----------------------------
-# Sidebar + LOGO
+# Sidebar filters
 # -----------------------------
 with st.sidebar:
-    st.image("logo/logo_wgv.png", width=200)
-    st.markdown("### Geographical level")
+    st.image("logo/logo_wgv.png", width=180)
+    st.markdown("### Administrative Filters")
 
-# -----------------------------
-# Filters
-# -----------------------------
 regions = sorted(gdf["region"].dropna().unique())
 region_selected = st.sidebar.selectbox("Region", regions)
-gdf_region = gdf[gdf["region"] == region_selected]
+gdf_r = gdf[gdf["region"] == region_selected]
 
-cercles = sorted(gdf_region["cercle"].dropna().unique())
+cercles = sorted(gdf_r["cercle"].dropna().unique())
 cercle_selected = st.sidebar.selectbox("Cercle", cercles)
-gdf_cercle = gdf_region[gdf_region["cercle"] == cercle_selected]
+gdf_c = gdf_r[gdf_r["cercle"] == cercle_selected]
 
-communes = sorted(gdf_cercle["commune"].dropna().unique())
+communes = sorted(gdf_c["commune"].dropna().unique())
 commune_selected = st.sidebar.selectbox("Commune", communes)
-gdf_commune = gdf_cercle[gdf_cercle["commune"] == commune_selected]
+gdf_com = gdf_c[gdf_c["commune"] == commune_selected]
 
-idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique().tolist())
-idse_selected = st.sidebar.selectbox("IDSE_NEW (optionnal)", idse_list)
+idse_list = ["No filter"] + sorted(gdf_com["idse_new"].dropna().unique())
+idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 
-# Filter GeoJSON by IDSE_NEW
-gdf_idse = gdf_commune.copy()
-if idse_selected != "No filtre":
-    gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
+if idse_selected != "No filter":
+    gdf_map = gdf_com[gdf_com["idse_new"] == idse_selected]
+else:
+    gdf_map = gdf_com.copy()
 
-# Create missing pop columns if needed
+# Ensure population fields
 for col in ["pop_se", "pop_se_ct"]:
-    if col not in gdf_idse.columns:
-        gdf_idse[col] = 0
+    if col not in gdf_map.columns:
+        gdf_map[col] = 0
 
 # -----------------------------
-# Map bounds
+# Map center
 # -----------------------------
-minx, miny, maxx, maxy = gdf_idse.total_bounds
-center_lat = (miny + maxy) / 2
-center_lon = (minx + maxx) / 2
+minx, miny, maxx, maxy = gdf_map.total_bounds
+center = [(miny + maxy) / 2, (minx + maxx) / 2]
 
 # -----------------------------
 # Folium Map
 # -----------------------------
-m = folium.Map(location=[center_lat, center_lon], zoom_start=19, tiles="OpenStreetMap")
-m.fit_bounds([[miny, minx], [maxy, maxx]])
+m = folium.Map(location=center, zoom_start=17, control_scale=True)
 
-# SE Polygon layer
+# --- Basemaps ---
+folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
+
+folium.TileLayer(
+    tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attr="Esri",
+    name="Satellite",
+    overlay=False
+).add_to(m)
+
+# --- IDSE layer ---
 folium.GeoJson(
-    gdf_idse,
-    name="IDSE Layer",
-    style_function=lambda x: {"fillOpacity": 0, "color": "blue", "weight": 2},
-    tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"], localize=True, sticky=True),
-    popup=folium.GeoJsonPopup(fields=["idse_new", "pop_se", "pop_se_ct"], localize=True)
+    gdf_map,
+    name="IDSE Polygons",
+    style_function=lambda x: {
+        "fillOpacity": 0.15,
+        "color": "blue",
+        "weight": 2
+    },
+    tooltip=folium.GeoJsonTooltip(
+        fields=["idse_new", "pop_se", "pop_se_ct"],
+        aliases=["IDSE", "Pop SE", "Pop Actuelle"]
+    )
 ).add_to(m)
 
 # -----------------------------
-# Upload CSV Points (LAT, LON, Masculin, Feminin)
+# CSV points upload
 # -----------------------------
-st.sidebar.markdown("### Import CSV Points")
-csv_file = st.sidebar.file_uploader(
-    "Upload CSV",
-    type=["csv"],
-    key="csv_points_uploader"
-)
+st.sidebar.markdown("### CSV Points")
+csv_file = st.sidebar.file_uploader("Upload CSV", type="csv")
 
 points_gdf = None
 if csv_file:
-    try:
-        df_csv = pd.read_csv(csv_file)
-        lat_col = "LAT"
-        lon_col = "LON"
+    df_csv = pd.read_csv(csv_file)
+    if {"LAT", "LON"}.issubset(df_csv.columns):
+        points_gdf = gpd.GeoDataFrame(
+            df_csv,
+            geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+            crs="EPSG:4326"
+        )
 
-        df_csv = df_csv.dropna(subset=[lat_col, lon_col])
-
-        if not df_csv.empty:
-            points_gdf = gpd.GeoDataFrame(
-                df_csv,
-                geometry=gpd.points_from_xy(df_csv[lon_col], df_csv[lat_col]),
-                crs="EPSG:4326"
-            )
-    except Exception as e:
-        st.sidebar.error(f"Error loading CSV: {e}")
-
-# Add CSV points to the map
-if points_gdf is not None and not points_gdf.empty:
+# --- CSV layer ---
+if points_gdf is not None:
+    fg_points = folium.FeatureGroup(name="CSV Points")
     for _, row in points_gdf.iterrows():
-        if pd.notna(row.geometry.x) and pd.notna(row.geometry.y):
-            folium.CircleMarker(
-                location=[row.geometry.y, row.geometry.x],
-                radius=2,
-                color="red",
-                fill=True,
-                fill_opacity=0.8
-            ).add_to(m)
+        folium.CircleMarker(
+            location=[row.geometry.y, row.geometry.x],
+            radius=3,
+            color="red",
+            fill=True,
+            fill_opacity=0.8
+        ).add_to(fg_points)
+    fg_points.add_to(m)
 
 # -----------------------------
-# Layout: Map left & Chart right
+# Legend
+# -----------------------------
+legend_html = """
+<div style="
+position: fixed;
+bottom: 40px; left: 40px;
+width: 180px;
+background-color: white;
+border:2px solid grey;
+z-index:9999;
+font-size:12px;
+padding:10px;">
+<b>Legend</b><br>
+<hr>
+<span style="color:blue;">■</span> IDSE Boundary<br>
+<span style="color:red;">●</span> CSV Points
+</div>
+"""
+m.get_root().html.add_child(folium.Element(legend_html))
+
+# --- Layer control ---
+folium.LayerControl(collapsed=False).add_to(m)
+
+# -----------------------------
+# Layout
 # -----------------------------
 col_map, col_chart = st.columns([4, 1])
 
 with col_map:
-    st.subheader(
-        f"🗺️ Commune : {commune_selected}"
-        if idse_selected == "No filtre"
-        else f"🗺️ IDSE {idse_selected}"
-    )
-    st_folium(m, width=530, height=350)
+    st.subheader("🗺️ Interactive Map")
+    st_folium(m, width=650, height=420)
 
 with col_chart:
-    # ---------------------------
-    # Bar Chart (GeoJSON)
-    # ---------------------------
-    if idse_selected == "No filter":
-        st.info("Select SE.")
-    else:
-        st.subheader("📊")
-
-        # Prepare data
-        df_geo_stats = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
-        df_geo_stats["idse_new"] = df_geo_stats["idse_new"].astype(str)
-        # Melt to long format
-        df_long = df_geo_stats.melt(
+    if idse_selected != "No filter":
+        df_stat = gdf_map[["idse_new", "pop_se", "pop_se_ct"]]
+        df_long = df_stat.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
-            var_name="Variable",
+            var_name="Type",
             value_name="Population"
         )
-        df_long["Variable"] = df_long["Variable"].replace({
-            "pop_se": "Pop SE",
-            "pop_se_ct": "Pop Actu"
-        })
-        # Bar chart with legend visible
-        chart = (
-            alt.Chart(df_long)
-            .mark_bar()
-            .encode(
-                x=alt.X(
-                    "idse_new:N",
-                    title=None,
-                    axis=alt.Axis(
-                        labelAngle=0,
-                        labelFontSize=10,
-                        ticks=False
-                    )
-                ),
-                xOffset="Variable:N",      # Bars side-by-side
-                y=alt.Y("Population:Q", title=None),
-                color=alt.Color(
-                    "Variable:N",
-                    title="Type",            # Name of legend
-                    legend=alt.Legend(
-                        orient="right",
-                        labelFontSize=10,
-                        titleFontSize=10,
-                        padding=0
-                    )
-                ),
-                tooltip=["idse_new", "Variable", "Population"]
-            )
-            .properties(width=80, height=120)
-        )
+        chart = alt.Chart(df_long).mark_bar().encode(
+            x="Type:N",
+            y="Population:Q",
+            color="Type:N"
+        ).properties(height=200)
         st.altair_chart(chart, use_container_width=True)
 
-        # ---------------------------
-        # Pie Chart (CSV: Masculin / Feminin)
-        # ---------------------------
-        st.subheader("Sex(M.F)")
-
-        if points_gdf is None:
-            st.warning("Select CSV file.")
-        else:
-            try:
-                points_inside = gpd.sjoin(
-                    points_gdf,
-                    gdf_idse[["idse_new", "geometry"]],
-                    predicate="within",
-                    how="inner"
-                )
-                if points_inside.empty:
-                    st.warning("NO SE selected.")
-                else:
-                    if not all(col in points_inside.columns for col in ["Masculin", "Feminin"]):
-                        st.error("Le CSV doit contenir les colonnes: Masculin, Feminin")
-                    else:
-                        total_masculin = int(points_inside["Masculin"].sum())
-                        total_feminin = int(points_inside["Feminin"].sum())
-                        total_population = total_masculin + total_feminin
-                        labels = ["M", "F"]
-                        values = [total_masculin, total_feminin]
-
-                        fig, ax = plt.subplots(figsize=(3.5, 3.5))
-                        wedges, texts, autotexts = ax.pie(
-                            values,
-                            labels=labels,
-                            autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
-                            textprops={'color': 'white', 'fontsize': 14}
-                        )
-                        st.pyplot(fig)
-
-                        st.markdown(f"""
-                       
-                        - 👨 M: **{total_masculin}**
-                        - 👩 F: **{total_feminin}**
-                        - 👥 Pop: **{total_population}**
-                        """)
-            except Exception as e:
-                st.error(f"Erreur lors du pie chart : {e}")
 # -----------------------------
 # Footer
 # -----------------------------
 st.markdown("""
-**Project: Geospatial Web Mapping** Developping with Streamlit under Python by **CAMARA, PhD** • © 2025
+---
+**Geospatial Web Mapping System**  
+Developed with **Streamlit & Python**  
+**CAMARA, PhD – Geomatics Engineering © 2025**
 """)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
