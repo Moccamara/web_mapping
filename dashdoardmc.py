@@ -205,9 +205,10 @@ map_data = st_folium(m, height=520, width=1100)
 # Footer
 # -----------------------------
 st.markdown("""
-**Project:**Developed with Streamlit, Folium & GeoPandas  
+**Project:** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
