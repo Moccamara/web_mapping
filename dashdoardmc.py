@@ -4,6 +4,9 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import MeasureControl, Draw
 from pathlib import Path
+import pandas as pd
+import altair as alt
+import matplotlib.pyplot as plt
 
 # =========================================================
 # APP CONFIG
@@ -44,7 +47,7 @@ if not geo_file:
     st.error("No GeoJSON or Shapefile found in /data")
     st.stop()
 
-gdf = gpd.read_file(geo_file)
+gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
 gdf.columns = gdf.columns.str.lower().str.strip()
 
 rename_map = {
@@ -54,144 +57,142 @@ rename_map = {
     "idse_new": "idse_new"
 }
 gdf = gdf.rename(columns=rename_map)
-
-# Geometry cleaning
-gdf = gdf.to_crs(epsg=4326)
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-# Column safety
-required_cols = ["region", "cercle", "commune", "idse_new"]
-missing = [c for c in required_cols if c not in gdf.columns]
-if missing:
-    st.error(f"Missing columns: {missing}")
-    st.stop()
+# Ensure population fields exist
+for col in ["pop_se", "pop_se_ct"]:
+    if col not in gdf.columns:
+        gdf[col] = 0
 
 # =========================================================
-# SIDEBAR – FILTERS
+# SIDEBAR FILTERS
 # =========================================================
 with st.sidebar:
     st.image("logo/logo_wgv.png", width=200)
     st.markdown("### 🗂️ Attribute Query")
 
-regions = sorted(gdf["region"].dropna().unique())
-region = st.sidebar.selectbox("Region", regions)
-gdf_region = gdf[gdf["region"] == region]
+region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
+gdf_r = gdf[gdf["region"] == region]
 
-cercles = sorted(gdf_region["cercle"].dropna().unique())
-cercle = st.sidebar.selectbox("Cercle", cercles)
-gdf_cercle = gdf_region[gdf_region["cercle"] == cercle]
+cercle = st.sidebar.selectbox("Cercle", sorted(gdf_r["cercle"].dropna().unique()))
+gdf_c = gdf_r[gdf_r["cercle"] == cercle]
 
-communes = sorted(gdf_cercle["commune"].dropna().unique())
-commune = st.sidebar.selectbox("Commune", communes)
-gdf_commune = gdf_cercle[gdf_cercle["commune"] == commune]
+commune = st.sidebar.selectbox("Commune", sorted(gdf_c["commune"].dropna().unique()))
+gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
-idse_selected = st.sidebar.selectbox("IDSE_NEW (optional)", idse_list)
+idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 
 gdf_idse = gdf_commune.copy()
 if idse_selected != "No filtre":
     gdf_idse = gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# MAP CENTER & BOUNDS
+# CSV UPLOAD (POINTS)
+# =========================================================
+st.sidebar.markdown("### 📥 Import CSV Points")
+csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+
+points_gdf = None
+if csv_file:
+    df_csv = pd.read_csv(csv_file)
+    if {"LAT", "LON"}.issubset(df_csv.columns):
+        points_gdf = gpd.GeoDataFrame(
+            df_csv,
+            geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+            crs="EPSG:4326"
+        )
+
+# =========================================================
+# MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-center_lat = (miny + maxy) / 2
-center_lon = (minx + maxx) / 2
+m = folium.Map(location=[(miny+maxy)/2, (minx+maxx)/2], zoom_start=15)
 
-# =========================================================
-# FOLIUM MAP
-# =========================================================
-m = folium.Map(location=[center_lat, center_lon], zoom_start=15)
-
-folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
+folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
     tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    name="Satellite (Esri)",
-    attr="Esri",
-    overlay=False
+    name="Satellite",
+    attr="Esri"
 ).add_to(m)
 
-# Auto zoom to selection
 m.fit_bounds([[miny, minx], [maxy, maxx]])
 
-# =========================================================
-# IDSE POLYGON LAYER
-# =========================================================
 folium.GeoJson(
     gdf_idse,
-    name="IDSE Polygons",
-    style_function=lambda x: {
-        "color": "blue",
-        "weight": 2,
-        "fillOpacity": 0.1
-    },
-    tooltip=folium.GeoJsonTooltip(
-        fields=["idse_new", "commune", "cercle", "region"],
-        aliases=["IDSE", "Commune", "Cercle", "Region"],
-        sticky=True
-    )
+    name="IDSE",
+    style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.1},
+    tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
-# =========================================================
-# TOOLS
-# =========================================================
-MeasureControl(
-    position="topright",
-    primary_length_unit="meters",
-    primary_area_unit="sqmeters"
-).add_to(m)
+if points_gdf is not None:
+    for _, r in points_gdf.iterrows():
+        folium.CircleMarker(
+            location=[r.geometry.y, r.geometry.x],
+            radius=3,
+            color="red",
+            fill=True
+        ).add_to(m)
 
-Draw(
-    position="topright",
-    export=True,
-    filename="digitized.geojson",
-    draw_options={
-        "polyline": True,
-        "polygon": True,
-        "rectangle": True,
-        "marker": True,
-        "circle": False
-    }
-).add_to(m)
-
+MeasureControl().add_to(m)
+Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 
 # =========================================================
-# LEGEND (COLLAPSIBLE)
+# LAYOUT
 # =========================================================
-legend_html = """
-<div style="position: fixed; bottom: 40px; left: 40px; z-index:9999;">
-<details>
-<summary style="background:white;padding:6px;border:2px solid grey;cursor:pointer;">
-Legend
-</summary>
-<div style="background:white;padding:10px;border:2px solid grey;width:200px;">
-<span style="color:blue;">■</span> IDSE Boundary<br>
-📏 Measure distance / area<br>
-✏️ Digitize features
-</div>
-</details>
-</div>
-"""
-m.get_root().html.add_child(folium.Element(legend_html))
+col_map, col_chart = st.columns([4, 1])
 
-# =========================================================
-# DISPLAY MAP
-# =========================================================
-st.subheader(
-    f"🗺️ Commune: {commune}"
-    if idse_selected == "No filtre"
-    else f"🗺️ IDSE: {idse_selected}"
-)
+with col_map:
+    st_folium(m, height=400, width=650)
 
-st_folium(m, height=380, width=650)
+with col_chart:
+    # ---------------------------
+    # BAR CHART
+    # ---------------------------
+    if idse_selected == "No filtre":
+        st.info("Select an IDSE")
+    else:
+        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].melt(
+            id_vars="idse_new",
+            value_vars=["pop_se", "pop_se_ct"],
+            var_name="Type",
+            value_name="Population"
+        )
+
+        df_long["Type"] = df_long["Type"].replace({
+            "pop_se": "Pop SE",
+            "pop_se_ct": "Pop Actu"
+        })
+
+        chart = alt.Chart(df_long).mark_bar().encode(
+            x="idse_new:N",
+            xOffset="Type:N",
+            y="Population:Q",
+            color=alt.Color("Type:N", legend=alt.Legend(orient="right")),
+            tooltip=["Type", "Population"]
+        ).properties(height=120)
+
+        st.altair_chart(chart, use_container_width=True)
+
+        # ---------------------------
+        # PIE CHART
+        # ---------------------------
+        st.subheader("Sex (M / F)")
+        if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
+            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+            if not pts.empty:
+                m_val = int(pts["Masculin"].sum())
+                f_val = int(pts["Feminin"].sum())
+
+                fig, ax = plt.subplots(figsize=(3, 3))
+                ax.pie([m_val, f_val], labels=["M", "F"], autopct="%1.1f%%")
+                st.pyplot(fig)
 
 # =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
-**Project:** Geospatial Enterprise Web Mapping  
-Developed with Streamlit, Folium & GeoPandas  
+**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
