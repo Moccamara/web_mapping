@@ -11,7 +11,7 @@ import pandas as pd
 # App config & title
 # -----------------------------
 st.set_page_config(layout="wide")
-st.title("🌍 QGIS-Inspired Web GIS – Spatial Query Enabled")
+st.title("🌍 Web GIS – Spatial")
 
 # -----------------------------
 # Load spatial data
@@ -209,6 +209,7 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
