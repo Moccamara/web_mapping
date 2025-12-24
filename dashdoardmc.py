@@ -158,9 +158,6 @@ Legend
 </summary>
 <div style="background:white;padding:10px;border:2px solid grey;width:200px;">
 <span style="color:blue;">■</span> IDSE Polygon<br>
-# 📏 Measure distance / area<br>
-# ✏️ Digitize features<br>
-# 🖱️ Click map = Spatial query
 </div>
 </details>
 </div>
@@ -208,6 +205,7 @@ st.markdown("""
 **Project:** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
