@@ -85,7 +85,7 @@ center_lon = (minx + maxx) / 2
 # -----------------------------
 # Create Folium map
 # -----------------------------
-m = folium.Map(location=[center_lat, center_lon], zoom_start=14)
+m = folium.Map(location=[center_lat, center_lon], zoom_start=13)
 
 # -----------------------------
 # Basemaps
@@ -158,9 +158,9 @@ Legend
 </summary>
 <div style="background:white;padding:10px;border:2px solid grey;width:200px;">
 <span style="color:blue;">■</span> IDSE Polygon<br>
-📏 Measure distance / area<br>
-✏️ Digitize features<br>
-🖱️ Click map = Spatial query
+# 📏 Measure distance / area<br>
+# ✏️ Digitize features<br>
+# 🖱️ Click map = Spatial query
 </div>
 </details>
 </div>
@@ -176,30 +176,30 @@ map_data = st_folium(m, height=520, width=1100)
 # -----------------------------
 # Spatial query (by click)
 # -----------------------------
-st.subheader("📍 Spatial Query Result")
+# st.subheader("📍 Spatial Query Result")
 
-if map_data and map_data.get("last_clicked"):
-    lat = map_data["last_clicked"]["lat"]
-    lon = map_data["last_clicked"]["lng"]
+# if map_data and map_data.get("last_clicked"):
+#     lat = map_data["last_clicked"]["lat"]
+#     lon = map_data["last_clicked"]["lng"]
 
-    clicked_point = Point(lon, lat)
-    gdf_point = gpd.GeoDataFrame(geometry=[clicked_point], crs="EPSG:4326")
+#     clicked_point = Point(lon, lat)
+#     gdf_point = gpd.GeoDataFrame(geometry=[clicked_point], crs="EPSG:4326")
 
-    intersected = gpd.sjoin(gdf_point, gdf_idse, predicate="within")
+#     intersected = gpd.sjoin(gdf_point, gdf_idse, predicate="within")
 
-    if not intersected.empty:
-        row = intersected.iloc[0]
-        st.success("IDSE Found ✔")
-        st.json({
-            "IDSE": row["idse_new"],
-            "Commune": row["commune"],
-            "Cercle": row["cercle"],
-            "Region": row["region"]
-        })
-    else:
-        st.warning("No IDSE polygon at this location")
-else:
-    st.info("Click anywhere on the map to identify spatial features")
+#     if not intersected.empty:
+#         row = intersected.iloc[0]
+#         st.success("IDSE Found ✔")
+#         st.json({
+#             "IDSE": row["idse_new"],
+#             "Commune": row["commune"],
+#             "Cercle": row["cercle"],
+#             "Region": row["region"]
+#         })
+#     else:
+#         st.warning("No IDSE polygon at this location")
+# else:
+#     st.info("Click anywhere on the map to identify spatial features")
 
 # -----------------------------
 # Footer
@@ -209,6 +209,7 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
