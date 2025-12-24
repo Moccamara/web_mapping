@@ -54,22 +54,41 @@ else:
 # =========================================================
 # LOAD MAIN SPATIAL DATA
 # =========================================================
-# -----------------------------
-# Folder containing GeoJSON/Shapefile
-# -----------------------------
-folder = Path("data")
-geo_file = next((f for f in folder.glob("*.geojson")), None)
-if not geo_file:
-    geo_file = next((f for f in folder.glob("*.shp")), None)
-if not geo_file:
-    st.error("No GeoJSON or Shapefile found in /data folder.")
+# =========================================================
+# LOAD SE DATA FROM GITHUB (NOT LOCAL)
+# =========================================================
+SE_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/se.geojson"
+
+try:
+    gdf = gpd.read_file(SE_GEOJSON_URL)
+except Exception as e:
+    st.error("❌ Failed to load SE GeoJSON from GitHub")
     st.stop()
-gdf = gpd.read_file(geo_file)
+
+# Normalize columns
 gdf.columns = gdf.columns.str.lower().str.strip()
-rename_map = {"lregion": "region", "lcercle": "cercle", "lcommune": "commune", "idse_new": "idse_new"}
+
+# Rename to dashboard standard
+rename_map = {
+    "lregion": "region",
+    "lcercle": "cercle",
+    "lcommune": "commune"
+}
 gdf = gdf.rename(columns=rename_map)
+
+# Ensure required columns exist
+for col in ["region", "cercle", "commune", "idse_new"]:
+    if col not in gdf.columns:
+        gdf[col] = ""
+
+for col in ["pop_se", "pop_se_ct"]:
+    if col not in gdf.columns:
+        gdf[col] = 0
+
+# CRS + geometry cleaning
 gdf = gdf.to_crs(epsg=4326)
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -225,5 +244,6 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
