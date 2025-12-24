@@ -55,22 +55,33 @@ else:
 # =========================================================
 # LOAD SPATIAL DATA
 # =========================================================
-DATA_PATH = Path("data")
-geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
-if not geo_file:
-    st.error("No GeoJSON or Shapefile found in /data")
+# =========================================================
+# LOAD SE POLYGONS FROM GITHUB (RAW)
+# =========================================================
+SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
+
+try:
+    gdf = gpd.read_file(SE_URL).to_crs(epsg=4326)
+except Exception as e:
+    st.error("Unable to load SE.geojson from GitHub")
+    st.exception(e)
     st.stop()
 
-gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
+# Normalize column names
 gdf.columns = gdf.columns.str.lower().str.strip()
+
+# Rename fields safely
 gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
     "lcommune": "commune",
     "idse_new": "idse_new"
 })
+
+# Geometry validation
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
+# Ensure population fields exist
 for col in ["pop_se", "pop_se_ct"]:
     if col not in gdf.columns:
         gdf[col] = 0
@@ -202,5 +213,6 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
