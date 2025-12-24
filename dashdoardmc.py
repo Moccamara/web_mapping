@@ -2,44 +2,25 @@ import streamlit as st
 import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
+from folium.plugins import MeasureControl, Draw
+from shapely.geometry import Point
 from pathlib import Path
 import pandas as pd
-import matplotlib.pyplot as plt
-import json
 
 # -----------------------------
 # App title
 # -----------------------------
-st.title("🌍 Geospatial Enterprise Solution")
+st.set_page_config(layout="wide")
+st.title("🌍 QGIS-Inspired Web GIS – Spatial Query Enabled")
 
 # -----------------------------
-# Authentication
-# -----------------------------
-if "auth_ok" not in st.session_state:
-    st.session_state.auth_ok = False
-
-PASSWORD = "mocc2025"
-
-if not st.session_state.auth_ok:
-    with st.sidebar:
-        st.header("🔐 Login")
-        pwd = st.text_input("Password", type="password")
-        if st.button("Login"):
-            if pwd == PASSWORD:
-                st.session_state.auth_ok = True
-                st.rerun()
-            else:
-                st.error("Incorrect password")
-    st.stop()
-
-# -----------------------------
-# Load GeoData
+# Load spatial data
 # -----------------------------
 DATA_PATH = Path("data")
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
 
 if not geo_file:
-    st.error("No GeoJSON or Shapefile found.")
+    st.error("No spatial file found in /data")
     st.stop()
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
@@ -54,11 +35,9 @@ rename_map = {
 gdf = gdf.rename(columns=rename_map)
 
 # -----------------------------
-# Sidebar Filters
+# Sidebar filters (Attribute Query)
 # -----------------------------
-with st.sidebar:
-    st.image("logo/logo_wgv.png", width=200)
-    st.markdown("### Administrative Filters")
+st.sidebar.header("🗂️ Attribute Query")
 
 regions = sorted(gdf["region"].dropna().unique())
 region = st.sidebar.selectbox("Region", regions)
@@ -71,46 +50,37 @@ gdf_c = gdf_r[gdf_r["cercle"] == cercle]
 communes = sorted(gdf_c["commune"].dropna().unique())
 commune = st.sidebar.selectbox("Commune", communes)
 
-gdf_com = gdf_c[gdf_c["commune"] == commune]
-
-idse_list = ["No filtre"] + sorted(gdf_com["idse_new"].dropna().unique())
-idse = st.sidebar.selectbox("IDSE_NEW", idse_list)
-
-if idse != "No filtre":
-    gdf_com = gdf_com[gdf_com["idse_new"] == idse]
+gdf_f = gdf_c[gdf_c["commune"] == commune]
 
 # -----------------------------
 # Map center
 # -----------------------------
-minx, miny, maxx, maxy = gdf_com.total_bounds
+minx, miny, maxx, maxy = gdf_f.total_bounds
 center_lat = (miny + maxy) / 2
 center_lon = (minx + maxx) / 2
 
 # -----------------------------
-# Folium Map
+# Create Folium Map
 # -----------------------------
-m = folium.Map(location=[center_lat, center_lon], zoom_start=18)
+m = folium.Map(location=[center_lat, center_lon], zoom_start=17)
 
-# --- Basemaps (hidden by default) ---
-folium.TileLayer(
-    "OpenStreetMap",
-    name="OpenStreetMap",
-    control=True
-).add_to(m)
+# -----------------------------
+# Basemaps
+# -----------------------------
+folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
 
 folium.TileLayer(
     tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attr="Esri",
     name="Satellite (Esri)",
-    overlay=False,
-    control=True
+    overlay=False
 ).add_to(m)
 
 # -----------------------------
-# IDSE Polygon Layer
+# Polygon layer
 # -----------------------------
 folium.GeoJson(
-    gdf_com,
+    gdf_f,
     name="IDSE Polygons",
     style_function=lambda x: {
         "color": "blue",
@@ -118,39 +88,43 @@ folium.GeoJson(
         "fillOpacity": 0.1
     },
     tooltip=folium.GeoJsonTooltip(
-        fields=["idse_new"],
-        aliases=["IDSE"]
+        fields=["idse_new", "commune"],
+        aliases=["IDSE", "Commune"]
     )
 ).add_to(m)
 
 # -----------------------------
-# Upload CSV Points
+# Measure tool
 # -----------------------------
-st.sidebar.markdown("### Upload CSV Points")
-csv_file = st.sidebar.file_uploader("CSV with LAT, LON", type=["csv"])
-
-if csv_file:
-    df_csv = pd.read_csv(csv_file)
-    points_layer = folium.FeatureGroup(name="CSV Points")
-
-    for _, r in df_csv.iterrows():
-        folium.CircleMarker(
-            location=[r["LAT"], r["LON"]],
-            radius=3,
-            color="red",
-            fill=True,
-            fill_opacity=0.8
-        ).add_to(points_layer)
-
-    points_layer.add_to(m)
+MeasureControl(
+    position="topright",
+    primary_length_unit="meters",
+    primary_area_unit="sqmeters"
+).add_to(m)
 
 # -----------------------------
-# Layer Control (collapsed)
+# Digitize / Draw tool
+# -----------------------------
+Draw(
+    position="topright",
+    export=True,
+    filename="digitized.geojson",
+    draw_options={
+        "polyline": True,
+        "polygon": True,
+        "rectangle": True,
+        "marker": True,
+        "circle": False
+    }
+).add_to(m)
+
+# -----------------------------
+# Layer control (collapsed)
 # -----------------------------
 folium.LayerControl(collapsed=True).add_to(m)
 
 # -----------------------------
-# Collapsible Legend
+# Collapsible legend
 # -----------------------------
 legend_html = """
 <div style="position: fixed; bottom: 40px; left: 40px; z-index:9999;">
@@ -159,8 +133,10 @@ legend_html = """
 Legend
 </summary>
 <div style="background:white;padding:10px;border:2px solid grey;width:180px;">
-<span style="color:blue;">■</span> IDSE Boundary<br>
-<span style="color:red;">●</span> CSV Points
+<span style="color:blue;">■</span> IDSE Polygon<br>
+📏 Measure Tool<br>
+✏️ Digitize Tool<br>
+🖱️ Click = Spatial Query
 </div>
 </details>
 </div>
@@ -168,15 +144,45 @@ Legend
 m.get_root().html.add_child(folium.Element(legend_html))
 
 # -----------------------------
-# Display Map
+# Display map
 # -----------------------------
-st.subheader(f"🗺️ {commune}")
-st_folium(m, width=700, height=450)
+st.subheader("🗺️ Click on the map to run a spatial query")
+map_data = st_folium(m, height=520, width=1000)
+
+# -----------------------------
+# SPATIAL QUERY (Map Click)
+# -----------------------------
+st.subheader("📍 Spatial Query Result")
+
+if map_data and map_data.get("last_clicked"):
+    lat = map_data["last_clicked"]["lat"]
+    lon = map_data["last_clicked"]["lng"]
+
+    clicked_point = Point(lon, lat)
+    gdf_point = gpd.GeoDataFrame(geometry=[clicked_point], crs="EPSG:4326")
+
+    intersected = gpd.sjoin(gdf_point, gdf_f, predicate="within")
+
+    if not intersected.empty:
+        row = intersected.iloc[0]
+        st.success("IDSE Found ✔")
+        st.write({
+            "IDSE": row["idse_new"],
+            "Commune": row["commune"],
+            "Cercle": row["cercle"],
+            "Region": row["region"]
+        })
+    else:
+        st.warning("No IDSE polygon at this location")
+
+else:
+    st.info("Click anywhere on the map to identify spatial features")
 
 # -----------------------------
 # Footer
 # -----------------------------
 st.markdown("""
-**Project:** Geospatial Web Mapping  
-Developed with Streamlit & Python by **CAMARA, PhD** © 2025
+**Project:** QGIS-Inspired Web GIS with Spatial Query  
+Developed using Streamlit, Folium & GeoPandas  
+**CAMARA, PhD – Geomatics Engineering** © 2025
 """)
