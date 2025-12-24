@@ -55,21 +55,31 @@ else:
 # LOAD SPATIAL DATA
 # =========================================================
 DATA_PATH = Path("data")
+DATA_PATH.mkdir(exist_ok=True)
+
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
 if not geo_file:
     st.error("No GeoJSON or Shapefile found in /data")
     st.stop()
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
+# Normalize column names
 gdf.columns = gdf.columns.str.lower().str.strip()
-gdf = gdf.rename(columns={
-    "lregion": "region",
-    "lcercle": "cercle",
-    "lcommune": "commune",
-    "idse_new": "idse_new"
-})
-gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
+# Safe renaming
+if "lregion" in gdf.columns: gdf = gdf.rename(columns={"lregion": "region"})
+if "lcercle" in gdf.columns: gdf = gdf.rename(columns={"lcercle": "cercle"})
+if "lcommune" in gdf.columns: gdf = gdf.rename(columns={"lcommune": "commune"})
+if "idse_new" not in gdf.columns: gdf["idse_new"] = gdf.index.astype(str)
+
+# Check required columns
+required_cols = ["region", "cercle", "commune", "idse_new"]
+for col in required_cols:
+    if col not in gdf.columns:
+        st.error(f"Missing required column: {col}")
+        st.stop()
+
+gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 for col in ["pop_se", "pop_se_ct"]:
     if col not in gdf.columns:
         gdf[col] = 0
@@ -96,12 +106,6 @@ gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_comm
 # =========================================================
 # POINTS UPLOAD & AUTOMATIC GEOJSON
 # =========================================================
-# =========================================================
-# POINTS UPLOAD & AUTOMATIC GEOJSON
-# =========================================================
-DATA_PATH = Path("data")
-DATA_PATH.mkdir(exist_ok=True)
-
 points_csv_path = DATA_PATH / "concession.csv"
 points_geojson_path = DATA_PATH / "concession.geojson"
 
@@ -128,29 +132,6 @@ if points_geojson_path.exists():
     points_gdf = gpd.read_file(points_geojson_path)
 else:
     points_gdf = None
-
-
-
-# -----------------------------
-# Load points for all users
-# -----------------------------
-points_gdf = None
-
-# First try local GeoJSON
-if points_geojson_path.exists():
-    points_gdf = gpd.read_file(points_geojson_path)
-
-# If local GeoJSON not found, try GitHub
-else:
-    try:
-        r = requests.get(GITHUB_GEOJSON_URL)
-        r.raise_for_status()
-        temp_path = Path(tempfile.gettempdir()) / "concession.geojson"
-        temp_path.write_bytes(r.content)
-        points_gdf = gpd.read_file(temp_path)
-        st.sidebar.info("🌐 Loaded points from GitHub.")
-    except Exception as e:
-        st.sidebar.warning(f"Could not load points from GitHub: {e}")
 
 # =========================================================
 # MAP
@@ -179,7 +160,7 @@ if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
-            radius=3,
+            radius=4,
             color="red",
             fill=True,
             fill_opacity=0.8
@@ -194,7 +175,7 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 col_map, col_chart = st.columns((3, 1), gap="small")
 with col_map:
-    st_folium(m, height=450, use_container_width=True)
+    st_folium(m, height=500, use_container_width=True)
 
 with col_chart:
     if idse_selected == "No filtre":
@@ -227,25 +208,6 @@ with col_chart:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        st.subheader("👥 Sex (M / F)")
-        if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
-            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-            if not pts.empty:
-                fig, ax = plt.subplots(figsize=(1, 1))
-                ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()], labels=["M", "F"], autopct="%1.1f%%")
-                st.pyplot(fig)
-
-# =========================================================
-# ADMIN EXPORT
-# =========================================================
-if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 💾 Admin Export")
-    export_btn = st.sidebar.button("Export Filtered Data to CSV")
-    if export_btn:
-        export_file = UPLOAD_DIR / f"export_{idse_selected}.csv"
-        gdf_idse.to_csv(export_file, index=False)
-        st.sidebar.success(f"Data exported as {export_file.name}")
-
 # =========================================================
 # FOOTER
 # =========================================================
@@ -254,7 +216,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
-
-
