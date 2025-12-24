@@ -57,7 +57,7 @@ else:
 # =========================================================
 # LOAD SE DATA FROM GITHUB (NOT LOCAL)
 # =========================================================
-SE_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/se.geojson"
+SE_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
 
 try:
     gdf = gpd.read_file(SE_GEOJSON_URL)
@@ -244,6 +244,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
