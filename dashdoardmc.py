@@ -23,7 +23,7 @@ USERS = {
 }
 
 # =========================================================
-# LOGIN SIDEBAR
+# SESSION STATE INITIALIZATION
 # =========================================================
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
@@ -31,23 +31,23 @@ if "auth_ok" not in st.session_state:
     st.session_state.username = None
     st.session_state.login_attempted = False
 
+# =========================================================
+# LOGIN SIDEBAR
+# =========================================================
 if not st.session_state.auth_ok:
-    with st.sidebar:
-        st.header("🔐 Login")
-        username = st.text_input("Username", key="username_input")
-        password = st.text_input("Password", type="password", key="password_input")
-        login_btn = st.button("Login")
+    st.sidebar.header("🔐 Login")
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    login_btn = st.sidebar.button("Login")
 
-        if login_btn:
-            st.session_state.login_attempted = True
-            if username in USERS and USERS[username]["password"] == password:
-                st.session_state.auth_ok = True
-                st.session_state.user_role = USERS[username]["role"]
-                st.session_state.username = username
-                st.experimental_rerun()  # safe rerun after state update
-            else:
-                st.error("❌ Invalid username or password")
-
+    if login_btn:
+        if username in USERS and USERS[username]["password"] == password:
+            st.session_state.auth_ok = True
+            st.session_state.user_role = USERS[username]["role"]
+            st.session_state.username = username
+            st.success(f"Logged in as {username} ({st.session_state.user_role})")
+        else:
+            st.error("❌ Invalid username or password")
     st.stop()
 else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
@@ -57,7 +57,6 @@ else:
 # =========================================================
 DATA_PATH = Path("data")
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
-
 if not geo_file:
     st.error("No GeoJSON or Shapefile found in /data")
     st.stop()
@@ -79,9 +78,8 @@ for col in ["pop_se", "pop_se_ct"]:
 # =========================================================
 # SIDEBAR FILTERS
 # =========================================================
-with st.sidebar:
-    st.image("logo/logo_wgv.png", use_container_width=True)
-    st.markdown("### 🗂️ Attribute Query")
+st.sidebar.image("logo/logo_wgv.png", use_container_width=True)
+st.sidebar.markdown("### 🗂️ Attribute Query")
 
 region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
 gdf_r = gdf[gdf["region"] == region]
@@ -94,11 +92,10 @@ gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
-
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS) - only Admin
+# CSV UPLOAD (POINTS) - Admin only
 # =========================================================
 points_gdf = None
 if st.session_state.user_role == "Admin":
@@ -115,6 +112,7 @@ if st.session_state.user_role == "Admin":
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
+
 # =========================================================
 # MAP
 # =========================================================
@@ -129,7 +127,6 @@ folium.TileLayer(
 ).add_to(m)
 
 m.fit_bounds([[miny, minx], [maxy, maxx]])
-
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
@@ -155,7 +152,6 @@ folium.LayerControl(collapsed=True).add_to(m)
 # LAYOUT
 # =========================================================
 col_map, col_chart = st.columns((3, 1), gap="small")
-
 with col_map:
     st_folium(m, height=450, use_container_width=True)
 
@@ -195,11 +191,7 @@ with col_chart:
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
                 fig, ax = plt.subplots(figsize=(1, 1))
-                ax.pie(
-                    [pts["Masculin"].sum(), pts["Feminin"].sum()],
-                    labels=["M", "F"],
-                    autopct="%1.1f%%"
-                )
+                ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()], labels=["M", "F"], autopct="%1.1f%%")
                 st.pyplot(fig)
 
 # =========================================================
@@ -221,5 +213,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
