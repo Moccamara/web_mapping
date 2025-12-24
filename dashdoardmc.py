@@ -97,13 +97,21 @@ gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_comm
 # =========================================================
 # CSV UPLOAD (POINTS) - Admin only, shared with all users
 # =========================================================
-import os
 
+from pathlib import Path
+import pandas as pd
+import geopandas as gpd
+
+# Create folder for uploaded points
 UPLOAD_DIR = Path("uploaded_points")
 UPLOAD_DIR.mkdir(exist_ok=True)
-points_file_path = UPLOAD_DIR / "points.csv"
 
+points_csv_path = UPLOAD_DIR / "points.csv"
+points_geojson_path = UPLOAD_DIR / "points.geojson"
+
+# ------------------------------
 # Admin uploads CSV
+# ------------------------------
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -113,19 +121,29 @@ if st.session_state.user_role == "Admin":
             df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
             df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
-            df_csv.to_csv(points_file_path, index=False)  # save for all sessions
-            # st.success("✅ CSV uploaded and points will be visible to all users")
+            
+            # Save CSV for persistence
+            df_csv.to_csv(points_csv_path, index=False)
 
-# Load points for all users
-if points_file_path.exists():
-    df_points = pd.read_csv(points_file_path)
-    points_gdf = gpd.GeoDataFrame(
-        df_points,
-        geometry=gpd.points_from_xy(df_points["LON"], df_points["LAT"]),
-        crs="EPSG:4326"
-    )
+            # Convert to GeoDataFrame
+            points_gdf = gpd.GeoDataFrame(
+                df_csv,
+                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+                crs="EPSG:4326"
+            )
+
+            # Save as GeoJSON automatically
+            points_gdf.to_file(points_geojson_path, driver="GeoJSON")
+            st.sidebar.success("CSV uploaded and saved as GeoJSON!")
+
+# ------------------------------
+# Load points for all users (Admin + Customer)
+# ------------------------------
+if points_geojson_path.exists():
+    points_gdf = gpd.read_file(points_geojson_path)
 else:
     points_gdf = None
+
 
 
 
@@ -218,6 +236,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
