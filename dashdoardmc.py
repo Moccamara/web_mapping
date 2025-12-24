@@ -204,7 +204,7 @@ with col_chart:
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
-                fig, ax = plt.subplots(figsize=(2, 2))
+                fig, ax = plt.subplots(figsize=(1, 1))
                 ax.pie(
                     [pts["Masculin"].sum(), pts["Feminin"].sum()],
                     labels=["M", "F"],
@@ -221,5 +221,6 @@ st.markdown(
     **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
     **CAMARA, PhD – Geomatics Engineering** © 2025
     """)
+
 
 
