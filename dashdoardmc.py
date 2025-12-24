@@ -104,7 +104,6 @@ DATA_PATH.mkdir(exist_ok=True)
 
 points_csv_path = DATA_PATH / "concession.csv"
 points_geojson_path = DATA_PATH / "concession.geojson"
-GITHUB_GEOJSON_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/concession.geojson"
 
 # Admin uploads CSV
 if st.session_state.user_role == "Admin":
@@ -114,9 +113,9 @@ if st.session_state.user_role == "Admin":
         df_csv = pd.read_csv(csv_file)
         if {"LAT", "LON"}.issubset(df_csv.columns):
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
-            df_csv.to_csv(points_csv_path, index=False)  # save CSV in data folder
+            df_csv.to_csv(points_csv_path, index=False)
 
-            # Convert automatically to GeoJSON in the same folder
+            # Convert automatically to GeoJSON
             points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
@@ -127,12 +126,9 @@ if st.session_state.user_role == "Admin":
 # Load points for all users
 if points_geojson_path.exists():
     points_gdf = gpd.read_file(points_geojson_path)
-elif st.session_state.user_role != "Admin":
-    # Fetch from GitHub if customer and local file missing
-    try:
-        points_gdf = gpd.read_file(GITHUB_GEOJSON_URL)
-    except:
-        points_gdf = None
+else:
+    points_gdf = None
+
 
 
 # -----------------------------
@@ -258,6 +254,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
