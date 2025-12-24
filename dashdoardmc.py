@@ -114,7 +114,7 @@ if st.session_state.user_role == "Admin":
             df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
             df_csv.to_csv(points_file_path, index=False)  # save for all sessions
-            st.success("✅ CSV uploaded and points will be visible to all users")
+            # st.success("✅ CSV uploaded and points will be visible to all users")
 
 # Load points for all users
 if points_file_path.exists():
@@ -218,6 +218,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
