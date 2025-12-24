@@ -15,28 +15,30 @@ st.set_page_config(layout="wide", page_title="🌍 Geospatial Enterprise Solutio
 st.title("🌍 Geospatial Enterprise Solution")
 
 # =========================================================
-# USERS & ROLES
+# 🔐 PASSWORD & ROLE AUTHENTICATION
 # =========================================================
-USERS = {
-    "admin": {"password": "admin123", "role": "Admin"},
-    "customer": {"password": "cust2025", "role": "Customer"}
-}
-
 if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.user_role = None
+    st.session_state.username = None
+
+# Example credentials
+USERS = {
+    "admin": {"password": "admin2025", "role": "Admin"},
+    "customer": {"password": "cust2025", "role": "Customer"}
+}
 
 if not st.session_state.auth_ok:
     with st.sidebar:
-        st.header("🔐 Authentication")
+        st.header("🔐 Login")
         username = st.text_input("Username")
-        pwd = st.text_input("Password", type="password")
+        password = st.text_input("Password", type="password")
         if st.button("Login"):
-            if username in USERS and pwd == USERS[username]["password"]:
+            if username in USERS and USERS[username]["password"] == password:
                 st.session_state.auth_ok = True
                 st.session_state.user_role = USERS[username]["role"]
-                st.success(f"Logged in as {st.session_state.user_role}")
-                st.rerun()
+                st.session_state.username = username
+                st.experimental_rerun()
             else:
                 st.error("❌ Invalid username or password")
     st.stop()
@@ -46,23 +48,19 @@ if not st.session_state.auth_ok:
 # =========================================================
 DATA_PATH = Path("data")
 geo_file = next(DATA_PATH.glob("*.geojson"), None) or next(DATA_PATH.glob("*.shp"), None)
-
 if not geo_file:
     st.error("No GeoJSON or Shapefile found in /data")
     st.stop()
 
 gdf = gpd.read_file(geo_file).to_crs(epsg=4326)
 gdf.columns = gdf.columns.str.lower().str.strip()
-
 gdf = gdf.rename(columns={
     "lregion": "region",
     "lcercle": "cercle",
     "lcommune": "commune",
     "idse_new": "idse_new"
 })
-
 gdf = gdf[gdf.is_valid & ~gdf.is_empty]
-
 for col in ["pop_se", "pop_se_ct"]:
     if col not in gdf.columns:
         gdf[col] = 0
@@ -89,29 +87,42 @@ idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (POINTS) – ADMIN ONLY
+# CSV UPLOAD (POINTS)
 # =========================================================
+st.sidebar.markdown("### 📥 Import CSV Points")
+csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+
 points_gdf = None
+if csv_file:
+    df_csv = pd.read_csv(csv_file)
+    if {"LAT", "LON"}.issubset(df_csv.columns):
+        df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+        df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+        df_csv = df_csv.dropna(subset=["LAT", "LON"])
+
+        points_gdf = gpd.GeoDataFrame(
+            df_csv,
+            geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+            crs="EPSG:4326"
+        )
+
+# =========================================================
+# ADMIN EXPORT BUTTON (SIDEBAR)
+# =========================================================
 if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 📥 Import CSV Points")
-    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-    if csv_file:
-        df_csv = pd.read_csv(csv_file)
-        if {"LAT", "LON"}.issubset(df_csv.columns):
-            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
-            df_csv = df_csv.dropna(subset=["LAT", "LON"])
-            points_gdf = gpd.GeoDataFrame(
-                df_csv,
-                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
-                crs="EPSG:4326"
-            )
+    st.sidebar.markdown("### 💾 Export Data")
+    st.sidebar.download_button(
+        label="Export Filtered Data",
+        data=gdf_idse.to_csv(index=False).encode("utf-8"),
+        file_name="filtered_data.csv",
+        mime="text/csv"
+    )
 
 # =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=15)
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=19)
 
 folium.TileLayer(name="OSM").add_to(m)
 folium.TileLayer(
@@ -126,10 +137,8 @@ folium.GeoJson(
     gdf_idse,
     name="IDSE",
     style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
-    tooltip=folium.GeoJsonTooltip(
-        fields=["idse_new", "pop_se", "pop_se_ct"],
-        aliases=["IDSE", "Pop SE", "Pop Actu"]
-    )
+    tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"],
+                                  aliases=["IDSE", "Pop SE", "Pop Actu"])
 ).add_to(m)
 
 if points_gdf is not None:
@@ -147,7 +156,7 @@ Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 
 # =========================================================
-# LAYOUT (RESPONSIVE)
+# LAYOUT (MAP + CHART)
 # =========================================================
 col_map, col_chart = st.columns((3, 1), gap="small")
 
@@ -159,14 +168,17 @@ with col_chart:
         st.info("Select SE.")
     else:
         st.subheader("📊 Population")
+
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
+
         df_long = df_long.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
             var_name="Variable",
             value_name="Population"
         )
+
         df_long["Variable"] = df_long["Variable"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
@@ -186,7 +198,6 @@ with col_chart:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # PIE CHART
         st.subheader("👥 Sex (M / F)")
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
