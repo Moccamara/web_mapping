@@ -18,7 +18,7 @@ st.title("🌍 Geospatial Enterprise Solution")
 # USERS AND ROLES
 # =========================================================
 USERS = {
-    "admin": {"password": "admin123", "role": "Admin"},
+    "admin": {"password": "admin2025", "role": "Admin"},
     "customer": {"password": "cust2025", "role": "Customer"}
 }
 
@@ -225,3 +225,4 @@ st.markdown(
     **CAMARA, PhD – Geomatics Engineering** © 2025
     """
 )
+
