@@ -54,7 +54,6 @@ if not geo_file:
 if not geo_file:
     st.error("Aucun fichier GeoJSON ou Shapefile trouvé dans le dossier.")
     st.stop()
-
 # Load GeoJSON
 gdf = gpd.read_file(geo_file)
 gdf.columns = gdf.columns.str.lower().str.strip()
@@ -194,7 +193,6 @@ with col_chart:
         # Prepare data
         df_geo_stats = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_geo_stats["idse_new"] = df_geo_stats["idse_new"].astype(str)
-
         # Melt to long format
         df_long = df_geo_stats.melt(
             id_vars="idse_new",
@@ -202,12 +200,10 @@ with col_chart:
             var_name="Variable",
             value_name="Population"
         )
-
         df_long["Variable"] = df_long["Variable"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
         })
-
         # Bar chart with legend visible
         chart = (
             alt.Chart(df_long)
@@ -238,7 +234,6 @@ with col_chart:
             )
             .properties(width=80, height=120)
         )
-
         st.altair_chart(chart, use_container_width=True)
 
         # ---------------------------
@@ -256,7 +251,6 @@ with col_chart:
                     predicate="within",
                     how="inner"
                 )
-
                 if points_inside.empty:
                     st.warning("NO SE selected.")
                 else:
@@ -266,7 +260,6 @@ with col_chart:
                         total_masculin = int(points_inside["Masculin"].sum())
                         total_feminin = int(points_inside["Feminin"].sum())
                         total_population = total_masculin + total_feminin
-
                         labels = ["M", "F"]
                         values = [total_masculin, total_feminin]
 
@@ -277,7 +270,6 @@ with col_chart:
                             autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
                             textprops={'color': 'white', 'fontsize': 14}
                         )
-                        
                         st.pyplot(fig)
 
                         st.markdown(f"""
@@ -286,71 +278,15 @@ with col_chart:
                         - 👩 F: **{total_feminin}**
                         - 👥 Pop: **{total_population}**
                         """)
-
             except Exception as e:
                 st.error(f"Erreur lors du pie chart : {e}")
-
-# -----------------------------
-# QGIS Button - Save selection
-# -----------------------------
-import os
-import json
-import streamlit as st
-from pathlib import Path
-
-# -----------------------------
-# QGIS Button - Save selection (LOCAL ONLY)
-# -----------------------------
-
-import os
-import json
-import streamlit as st
-from pathlib import Path
-
-# -----------------------------
-# OPEN QGIS PROJECT AUTOMATICALLY
-# -----------------------------
-
-QGIS_PROJECT = Path(r"D:\Web_Mapping\geo_env\qgis_project\project.qgz")
-SE_FILE = Path(r"D:\Web_Mapping\geo_env\qgis_project\se_selected\selected_se.json")
-
-if st.button("🟢 Ouvrir automatiquement dans QGIS"):
-    try:
-        # Sélection pour la macro QGIS
-        selected_info = {
-            "region": region_selected,
-            "cercle": cercle_selected,
-            "commune": commune_selected,
-            "idse_new": idse_selected
-        }
-
-        SE_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(SE_FILE, "w", encoding="utf-8") as f:
-            json.dump(selected_info, f, ensure_ascii=False, indent=4)
-
-        # 🔥 OUVERTURE AUTOMATIQUE DU PROJET QGIS
-        os.startfile(QGIS_PROJECT)
-
-        st.success("✅ Projet QGIS ouvert automatiquement")
-
-    except Exception as e:
-        st.error(f"Erreur : {e}")
-
-
-
-
-
-
-
-
 # -----------------------------
 # Footer
 # -----------------------------
 st.markdown("""
-**Projet : Actualisation de la cartographie du RGPG5 (AC-RGPH5) – Mali**  
-Développé avec Streamlit sous Python par **CAMARA, PhD** • © 2025
+**Project: Geospatial Web Mapping** Developping with Streamlit under Python by **CAMARA, PhD** • © 2025
 """)
+
 
 
 
