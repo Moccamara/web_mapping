@@ -35,6 +35,13 @@ rename_map = {
 gdf = gdf.rename(columns=rename_map)
 
 # -----------------------------
+# Sidebar + LOGO
+# -----------------------------
+with st.sidebar:
+    st.image("logo/logo_wgv.png", width=200)
+    st.markdown("### Geographical level")
+
+# -----------------------------
 # Sidebar filters (Attribute Query)
 # -----------------------------
 st.sidebar.header("🗂️ Attribute Query")
@@ -199,4 +206,5 @@ st.markdown("""
 Developed using Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
