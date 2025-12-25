@@ -30,39 +30,33 @@ if "auth_ok" not in st.session_state:
     st.session_state.user_role = None
     st.session_state.page = "Home"  # default page
 
-# -----------------------------
-# LOGIN
-# -----------------------------
-if "auth_ok" not in st.session_state:
+# =========================================================
+# LOGOUT FUNCTION
+# =========================================================
+def logout():
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
+    st.session_state.page = "Home"
+    st.experimental_rerun()
 
-if not st.session_state.auth_ok:
-    st.sidebar.header("🔐 Login")
+# =========================================================
+# HOME PAGE (Login)
+# =========================================================
+if not st.session_state.auth_ok or st.session_state.page == "Home":
+    st.sidebar.header("🔐 Login / Home")
     username = st.sidebar.selectbox("User", list(USERS.keys()))
     password = st.sidebar.text_input("Password", type="password")
-
     if st.sidebar.button("Login"):
         if password == USERS[username]["password"]:
             st.session_state.auth_ok = True
             st.session_state.username = username
             st.session_state.user_role = USERS[username]["role"]
-            st.success(f"Logged in as {username}")
-            st.stop()  # Stops execution so Streamlit refreshes safely
+            st.session_state.page = "Dashboard"
+            st.experimental_rerun()
         else:
             st.sidebar.error("❌ Incorrect password")
-
-# -----------------------------
-# LOGOUT
-# -----------------------------
-if st.session_state.auth_ok:
-    if st.sidebar.button("Logout"):
-        for key in ["auth_ok", "username", "user_role", "points_gdf", "page"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.experimental_rerun()  # Safe now because it’s inside a button callback
-
+    st.stop()
 
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
@@ -245,7 +239,3 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
-
-
