@@ -56,32 +56,52 @@ else:
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
-# SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
+# =========================================================
+# LOAD SE POLYGONS FROM GITHUB (RAW)
+# =========================================================
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE.geojson"
+
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
     gdf = gpd.read_file(url)
 
+    # CRS
     if gdf.crs is None:
         gdf = gdf.set_crs(epsg=4326)
     else:
         gdf = gdf.to_crs(epsg=4326)
 
+    # Normalize columns
     gdf.columns = gdf.columns.str.lower().str.strip()
 
+    # Rename fields
     gdf = gdf.rename(columns={
         "lregion": "region",
         "lcercle": "cercle",
         "lcommune": "commune"
     })
 
+    # Geometry cleaning
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
+    # Required fields
+    for col in ["region", "cercle", "commune", "idse_new"]:
+        if col not in gdf.columns:
+            gdf[col] = ""
 
     for col in ["pop_se", "pop_se_ct"]:
         if col not in gdf.columns:
             gdf[col] = 0
 
     return gdf
+
+
+# 🔴 THIS LINE WAS MISSING
+try:
+    gdf = load_se_data(SE_URL)
+except Exception:
+    st.error("❌ Unable to load SE.geojson from GitHub")
+    st.stop()
 
 
 # =========================================================
@@ -236,6 +256,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
