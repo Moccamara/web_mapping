@@ -56,41 +56,33 @@ else:
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
-SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
+# SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
+SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE.geojson"
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
-    try:
-        gdf = gpd.read_file(url)
+    gdf = gpd.read_file(url)
 
-        # Ensure CRS
-        if gdf.crs is None:
-            gdf = gdf.set_crs(epsg=4326)
-        else:
-            gdf = gdf.to_crs(epsg=4326)
+    if gdf.crs is None:
+        gdf = gdf.set_crs(epsg=4326)
+    else:
+        gdf = gdf.to_crs(epsg=4326)
 
-        # Normalize column names
-        gdf.columns = gdf.columns.str.lower().str.strip()
+    gdf.columns = gdf.columns.str.lower().str.strip()
 
-        # Rename fields safely
-        gdf = gdf.rename(columns={
-            "lregion": "region",
-            "lcercle": "cercle",
-            "lcommune": "commune"
-        })
+    gdf = gdf.rename(columns={
+        "lregion": "region",
+        "lcercle": "cercle",
+        "lcommune": "commune"
+    })
 
-        # Geometry validation
-        gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+    gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-        # Ensure population fields exist
-        for col in ["pop_se", "pop_se_ct"]:
-            if col not in gdf.columns:
-                gdf[col] = 0
-        return gdf
-    except Exception as e:
-        st.error("❌ Unable to load SE.geojson from GitHub")
-        st.exception(e)
-        st.stop()
-gdf = load_se_data(SE_URL)
+    for col in ["pop_se", "pop_se_ct"]:
+        if col not in gdf.columns:
+            gdf[col] = 0
+
+    return gdf
+
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -244,6 +236,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
