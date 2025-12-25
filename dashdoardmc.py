@@ -133,7 +133,6 @@ folium.TileLayer(
     name="Satellite",
     attr="Esri"
 ).add_to(m)
-
 m.fit_bounds([[miny, minx], [maxy, maxx]])
 folium.GeoJson(
     gdf_idse,
@@ -141,7 +140,6 @@ folium.GeoJson(
     style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
-
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -151,7 +149,6 @@ if points_gdf is not None:
             fill=True,
             fill_opacity=0.8
         ).add_to(m)
-
 MeasureControl().add_to(m)
 Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
@@ -160,10 +157,8 @@ folium.LayerControl(collapsed=True).add_to(m)
 # LAYOUT
 # =========================================================
 col_map, col_chart = st.columns((3, 1), gap="small")
-
 with col_map:
     st_folium(m, height=450, use_container_width=True)
-
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
@@ -219,14 +214,12 @@ with col_chart:
                     ]
                     if sum(values) > 0:
                         fig, ax = plt.subplots(figsize=(1, 1))
-
                         ax.pie(
                             values,
                             labels=["M", "F"],
-                            autopct="%1.1f%%",
+                            autopct="%1.1f%",
                             textprops={
                                 "fontsize": 5,
-                                # "fontweight": "normal"
                             }
                         )
                         st.pyplot(fig)
@@ -242,6 +235,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
