@@ -3,7 +3,6 @@ import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import MeasureControl, Draw
-from pathlib import Path
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
@@ -29,22 +28,16 @@ if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
+    st.session_state.points_gdf = None
 
 # =========================================================
-# LOGIN (REPLACES ROLE RADIO)
+# LOGIN
 # =========================================================
 if not st.session_state.auth_ok:
     st.sidebar.header("🔐 Login")
 
-    username = st.sidebar.selectbox(
-        "User",
-        list(USERS.keys())
-    )
-
-    password = st.sidebar.text_input(
-        "Password",
-        type="password"
-    )
+    username = st.sidebar.selectbox("User", list(USERS.keys()))
+    password = st.sidebar.text_input("Password", type="password")
 
     if st.sidebar.button("Login"):
         if password == USERS[username]["password"]:
@@ -121,29 +114,27 @@ gdf_idse = (
 )
 
 # =========================================================
-# CSV UPLOAD (ADMIN ONLY – VISIBLE TO ALL)
+# CSV UPLOAD (ADMIN ONLY)
 # =========================================================
-points_gdf = None
-
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+
     if csv_file:
         df_csv = pd.read_csv(csv_file)
+
         if {"LAT", "LON"}.issubset(df_csv.columns):
             df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
             df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
-            points_gdf = gpd.GeoDataFrame(
+
+            st.session_state.points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
-            st.session_state["points_gdf"] = points_gdf
 
-# Load points for customers
-if "points_gdf" in st.session_state:
-    points_gdf = st.session_state["points_gdf"]
+points_gdf = st.session_state.points_gdf
 
 # =========================================================
 # MAP
@@ -187,83 +178,75 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 # LAYOUT
 # =========================================================
-col_map, col_chart = st.columns((3, 1), gap="small")
+col_map, col_chart = st.columns((2.5, 1.5))
+
 with col_map:
     st_folium(m, height=450, use_container_width=True)
+
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
         # ===============================
-        # Population bar chart
+        # Population Bar Chart
         # ===============================
         st.subheader("📊 Population")
-        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
-        df_long["idse_new"] = df_long["idse_new"].astype(str)
-        df_long = df_long.melt(
-            id_vars="idse_new",
-            value_vars=["pop_se", "pop_se_ct"],
-            var_name="Variable",
+
+        df_long = gdf_idse[["pop_se", "pop_se_ct"]].melt(
+            var_name="Type",
             value_name="Population"
         )
-        df_long["Variable"] = df_long["Variable"].replace({
+
+        df_long["Type"] = df_long["Type"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
         })
+
         chart = (
             alt.Chart(df_long)
-            .mark_bar()
+            .mark_bar(size=18)
             .encode(
-                x=alt.X("idse_new:N", title=None),
-                xOffset="Variable:N",
-                y=alt.Y("Population:Q", title=None),
-                color=alt.Color(
-                    "Variable:N",
-                    legend=alt.Legend(orient="right", title="Type")
-                ),
-                tooltip=["idse_new", "Variable", "Population"]
+                x=alt.X("Type:N", title=None),
+                y=alt.Y("Population:Q", title="Population"),
+                color=alt.Color("Type:N", legend=None),
+                tooltip=["Type", "Population"]
             )
-            .properties(height=130)
+            .properties(height=220)
         )
+
         st.altair_chart(chart, use_container_width=True)
 
         # ===============================
-        # Sex pie chart (SAFE)
+        # Sex Pie Chart
         # ===============================
         st.subheader("👥 Sex (M / F)")
-        try:
-            if (
-                points_gdf is not None
-                and {"Masculin", "Feminin"}.issubset(points_gdf.columns)
-            ):
-                pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
 
-                if not pts.empty:
-                    values = [
-                        pts["Masculin"].sum(),
-                        pts["Feminin"].sum()
-                    ]
-                    if sum(values) > 0:
-                        fig, ax = plt.subplots(figsize=(1, 1))
-                        ax.pie(
-                            values,
-                            labels=["M", "F"],
-                            autopct="%1.1f%%",
-                            textprops={
-                                "fontsize": 5,
-                            }
-                        )
-                        st.pyplot(fig)
-        except Exception:
-            pass  # 🔇 no Streamlit error message
+        if (
+            points_gdf is not None
+            and {"Masculin", "Feminin"}.issubset(points_gdf.columns)
+        ):
+            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+
+            if not pts.empty:
+                values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
+
+                if sum(values) > 0:
+                    fig, ax = plt.subplots(figsize=(3.2, 3.2))
+                    ax.pie(
+                        values,
+                        labels=["Masculin", "Feminin"],
+                        autopct="%1.1f%%",
+                        startangle=90,
+                        textprops={"fontsize": 9}
+                    )
+                    ax.axis("equal")
+                    st.pyplot(fig)
 
 # =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
 ---
-**Geospatial Enterprise Web Mapping**  
-Developed with Streamlit, Folium & GeoPandas  
+**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
