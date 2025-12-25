@@ -120,21 +120,104 @@ gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_comm
 # =========================================================
 # CSV UPLOAD (POINTS) - Admin only
 # =========================================================
-points_gdf = None
+import streamlit as st
+import pandas as pd
+import geopandas as gpd
+import folium
+from streamlit_folium import st_folium
+from shapely.geometry import Point
+import os
+
+# =========================================================
+# CONFIG
+# =========================================================
+st.set_page_config(page_title="Shared Points Map", layout="wide")
+
+DATA_DIR = "data"
+GEOJSON_PATH = os.path.join(DATA_DIR, "shared_points.geojson")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# =========================================================
+# SIMULATED AUTH (replace with your real auth system)
+# =========================================================
+if "user_role" not in st.session_state:
+    st.session_state.user_role = "Customer"  # default
+
+st.sidebar.markdown("### 👤 User Role")
+role = st.sidebar.radio(
+    "Select role (demo)",
+    ["Admin", "Customer"],
+    index=0 if st.session_state.user_role == "Admin" else 1
+)
+st.session_state.user_role = role
+
+# =========================================================
+# ADMIN: CSV UPLOAD
+# =========================================================
 if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 📥 Import CSV Points")
-    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+    st.sidebar.markdown("### 📥 Upload CSV (Admin only)")
+    csv_file = st.sidebar.file_uploader(
+        "Upload CSV file",
+        type=["csv"]
+    )
+
     if csv_file:
-        df_csv = pd.read_csv(csv_file)
-        if {"LAT", "LON"}.issubset(df_csv.columns):
-            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
-            df_csv = df_csv.dropna(subset=["LAT", "LON"])
-            points_gdf = gpd.GeoDataFrame(
-                df_csv,
-                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+        df = pd.read_csv(csv_file)
+
+        if {"LAT", "LON"}.issubset(df.columns):
+            df["LAT"] = pd.to_numeric(df["LAT"], errors="coerce")
+            df["LON"] = pd.to_numeric(df["LON"], errors="coerce")
+            df = df.dropna(subset=["LAT", "LON"])
+
+            gdf = gpd.GeoDataFrame(
+                df,
+                geometry=gpd.points_from_xy(df["LON"], df["LAT"]),
                 crs="EPSG:4326"
             )
+
+            gdf.to_file(GEOJSON_PATH, driver="GeoJSON")
+            st.sidebar.success("✅ Points uploaded and shared successfully")
+
+        else:
+            st.sidebar.error("❌ CSV must contain LAT and LON columns")
+
+# =========================================================
+# LOAD SHARED POINTS (ALL USERS)
+# =========================================================
+points_gdf = None
+if os.path.exists(GEOJSON_PATH):
+    points_gdf = gpd.read_file(GEOJSON_PATH)
+
+# =========================================================
+# MAP DISPLAY
+# =========================================================
+st.title("📍 Shared Points Map")
+
+m = folium.Map(location=[0, 0], zoom_start=2, control_scale=True)
+
+if points_gdf is not None and not points_gdf.empty:
+    for _, row in points_gdf.iterrows():
+        popup_text = "<br>".join(
+            [f"<b>{col}</b>: {row[col]}" for col in points_gdf.columns if col != "geometry"]
+        )
+
+        folium.Marker(
+            location=[row.geometry.y, row.geometry.x],
+            popup=popup_text,
+            icon=folium.Icon(color="blue", icon="info-sign")
+        ).add_to(m)
+
+    # Zoom to points
+    m.fit_bounds([
+        [points_gdf.geometry.y.min(), points_gdf.geometry.x.min()],
+        [points_gdf.geometry.y.max(), points_gdf.geometry.x.max()]
+    ])
+else:
+    st.info("No points available yet. Admin must upload a CSV.")
+
+st_folium(m, width=1100, height=600)
+
 
 # =========================================================
 # MAP
@@ -250,6 +333,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
