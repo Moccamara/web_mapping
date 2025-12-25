@@ -35,20 +35,19 @@ if "auth_ok" not in st.session_state:
 # =========================================================
 if not st.session_state.auth_ok:
     st.sidebar.header("🔐 Login")
-
     username = st.sidebar.selectbox("User", list(USERS.keys()))
     password = st.sidebar.text_input("Password", type="password")
-
     if st.sidebar.button("Login"):
         if password == USERS[username]["password"]:
             st.session_state.auth_ok = True
             st.session_state.username = username
             st.session_state.user_role = USERS[username]["role"]
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.sidebar.error("❌ Incorrect password")
-
     st.stop()
+
+st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
@@ -58,30 +57,23 @@ SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
     gdf = gpd.read_file(url)
-
     if gdf.crs is None:
         gdf = gdf.set_crs(epsg=4326)
     else:
         gdf = gdf.to_crs(epsg=4326)
-
     gdf.columns = gdf.columns.str.lower().str.strip()
-
     gdf = gdf.rename(columns={
         "lregion": "region",
         "lcercle": "cercle",
         "lcommune": "commune"
     })
-
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
-
     for col in ["region", "cercle", "commune", "idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
-
     for col in ["pop_se", "pop_se_ct"]:
         if col not in gdf.columns:
             gdf[col] = 0
-
     return gdf
 
 try:
@@ -107,51 +99,41 @@ gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
-
-gdf_idse = (
-    gdf_commune if idse_selected == "No filtre"
-    else gdf_commune[gdf_commune["idse_new"] == idse_selected]
-)
+gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
 # CSV UPLOAD (ADMIN ONLY)
 # =========================================================
 if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 📥 Import CSV Points")
+    st.sidebar.markdown("### 📥 Upload CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-
     if csv_file:
         df_csv = pd.read_csv(csv_file)
-
         if {"LAT", "LON"}.issubset(df_csv.columns):
             df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
             df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
             df_csv = df_csv.dropna(subset=["LAT", "LON"])
-
-            st.session_state.points_gdf = gpd.GeoDataFrame(
+            points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
+            st.session_state.points_gdf = points_gdf
 
+# Load points for all users
 points_gdf = st.session_state.points_gdf
 
 # =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(
-    location=[(miny + maxy) / 2, (minx + maxx) / 2],
-    zoom_start=19
-)
-
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=19)
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
     tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     name="Satellite",
     attr="Esri"
 ).add_to(m)
-
 m.fit_bounds([[miny, minx], [maxy, maxx]])
 
 folium.GeoJson(
@@ -161,11 +143,11 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
-if points_gdf is not None:
+if points_gdf is not None and not points_gdf.empty:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
-            radius=3,
+            radius=4,
             color="red",
             fill=True,
             fill_opacity=0.8
@@ -178,75 +160,70 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 # LAYOUT
 # =========================================================
-col_map, col_chart = st.columns((2.5, 1.5))
-
+col_map, col_chart = st.columns((3, 1), gap="small")
 with col_map:
     st_folium(m, height=450, use_container_width=True)
-
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        # ===============================
-        # Population Bar Chart
-        # ===============================
+        # Population chart
         st.subheader("📊 Population")
-
-        df_long = gdf_idse[["pop_se", "pop_se_ct"]].melt(
-            var_name="Type",
+        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
+        df_long["idse_new"] = df_long["idse_new"].astype(str)
+        df_long = df_long.melt(
+            id_vars="idse_new",
+            value_vars=["pop_se", "pop_se_ct"],
+            var_name="Variable",
             value_name="Population"
         )
-
-        df_long["Type"] = df_long["Type"].replace({
+        df_long["Variable"] = df_long["Variable"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
         })
-
         chart = (
             alt.Chart(df_long)
-            .mark_bar(size=18)
+            .mark_bar()
             .encode(
-                x=alt.X("Type:N", title=None),
-                y=alt.Y("Population:Q", title="Population"),
-                color=alt.Color("Type:N", legend=None),
-                tooltip=["Type", "Population"]
+                x=alt.X("idse_new:N", title=None),
+                xOffset="Variable:N",
+                y=alt.Y("Population:Q", title=None),
+                color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
+                tooltip=["idse_new", "Variable", "Population"]
             )
-            .properties(height=220)
+            .properties(height=200)
         )
-
         st.altair_chart(chart, use_container_width=True)
 
-        # ===============================
-        # Sex Pie Chart
-        # ===============================
+        # Sex Pie Chart (from CSV)
         st.subheader("👥 Sex (M / F)")
-
-        if (
-            points_gdf is not None
-            and {"Masculin", "Feminin"}.issubset(points_gdf.columns)
-        ):
+        if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-
             if not pts.empty:
                 values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
-
                 if sum(values) > 0:
-                    fig, ax = plt.subplots(figsize=(3.2, 3.2))
+                    fig, ax = plt.subplots(figsize=(4, 4))
                     ax.pie(
                         values,
-                        labels=["Masculin", "Feminin"],
+                        labels=["M", "F"],
                         autopct="%1.1f%%",
                         startangle=90,
-                        textprops={"fontsize": 9}
+                        colors=["skyblue", "pink"]
                     )
-                    ax.axis("equal")
                     st.pyplot(fig)
+                else:
+                    st.info("No sex data in selected SE.")
+            else:
+                st.info("No points inside selected SE.")
+        else:
+            st.info("Upload a CSV with 'Masculin' and 'Feminin' columns.")
 
 # =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
 ---
-**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
+**Geospatial Enterprise Web Mapping**  
+Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
