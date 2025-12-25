@@ -40,7 +40,6 @@ if not st.session_state.auth_ok:
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
     login_btn = st.sidebar.button("Login")
-
     if login_btn:
         if username in USERS and USERS[username]["password"] == password:
             st.session_state.auth_ok = True
@@ -53,9 +52,6 @@ if not st.session_state.auth_ok:
 else:
     st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
-# =========================================================
-# LOAD SE POLYGONS FROM GITHUB (RAW)
-# =========================================================
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
@@ -95,14 +91,12 @@ def load_se_data(url):
 
     return gdf
 
-
 # 🔴 THIS LINE WAS MISSING
 try:
     gdf = load_se_data(SE_URL)
 except Exception:
     st.error("❌ Unable to load SE.geojson from GitHub")
     st.stop()
-
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -120,7 +114,7 @@ commune = st.sidebar.selectbox("Commune", sorted(gdf_c["commune"].dropna().uniqu
 gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
-idse_selected = st.sidebar.selectbox("IDSE_NEW", idse_list)
+idse_selected = st.sidebar.selectbox("Nunit_Geo", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
@@ -256,6 +250,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
