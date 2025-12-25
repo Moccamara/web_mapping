@@ -30,35 +30,38 @@ if "auth_ok" not in st.session_state:
     st.session_state.user_role = None
     st.session_state.page = "Home"  # default page
 
-# =========================================================
-# LOGOUT FUNCTION
-# =========================================================
-# Sidebar: Logout
-if st.sidebar.button("Logout"):
-    # Clear session state safely
-    for key in ["auth_ok", "username", "user_role", "points_gdf", "page"]:
-        if key in st.session_state:
-            del st.session_state[key]
-    # Rerun app safely
-    st.stop()
+# -----------------------------
+# LOGIN
+# -----------------------------
+if "auth_ok" not in st.session_state:
+    st.session_state.auth_ok = False
+    st.session_state.username = None
+    st.session_state.user_role = None
 
-# =========================================================
-# HOME PAGE (Login)
-# =========================================================
-if not st.session_state.auth_ok or st.session_state.page == "Home":
-    st.sidebar.header("🔐 Login / Home")
+if not st.session_state.auth_ok:
+    st.sidebar.header("🔐 Login")
     username = st.sidebar.selectbox("User", list(USERS.keys()))
     password = st.sidebar.text_input("Password", type="password")
+
     if st.sidebar.button("Login"):
         if password == USERS[username]["password"]:
             st.session_state.auth_ok = True
             st.session_state.username = username
             st.session_state.user_role = USERS[username]["role"]
-            st.session_state.page = "Dashboard"
-            st.experimental_rerun()
+            st.stop()  # Stop execution so app refreshes safely
         else:
             st.sidebar.error("❌ Incorrect password")
-    st.stop()
+
+# -----------------------------
+# LOGOUT
+# -----------------------------
+if st.session_state.auth_ok:
+    if st.sidebar.button("Logout"):
+        # Clear session state safely
+        for key in ["auth_ok", "username", "user_role", "points_gdf", "page"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.stop()  # Stop execution and refresh app
 
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
@@ -241,5 +244,6 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
