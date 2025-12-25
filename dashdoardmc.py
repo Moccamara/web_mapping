@@ -57,46 +57,52 @@ else:
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
 
-GITHUB_FOLDER_API = "https://api.github.com/repos/Moccamara/web_mapping/contents/data"
-TARGET_CRS = "EPSG:4326"
+import geopandas as gpd
+import streamlit as st
+
+SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
 
 @st.cache_data(show_spinner=False)
-def load_all_geojson(api_url):
-    """Load all GeoJSON files from a GitHub folder into a dict of GeoDataFrames."""
+def load_se_data(url):
     try:
-        response = requests.get(api_url, timeout=20)
-        response.raise_for_status()
+        gdf = gpd.read_file(url)
 
-        gdfs = {}
+        # Ensure CRS
+        if gdf.crs is None:
+            gdf = gdf.set_crs(epsg=4326)
+        else:
+            gdf = gdf.to_crs(epsg=4326)
 
-        for item in response.json():
-            if item["type"] == "file" and item["name"].lower().endswith(".geojson"):
-                gdf = gpd.read_file(item["download_url"])
+        # Normalize column names
+        gdf.columns = gdf.columns.str.lower().str.strip()
 
-                # CRS safety
-                if gdf.crs is None:
-                    gdf = gdf.set_crs(TARGET_CRS)
-                else:
-                    gdf = gdf.to_crs(TARGET_CRS)
+        # Rename fields safely
+        gdf = gdf.rename(columns={
+            "lregion": "region",
+            "lcercle": "cercle",
+            "lcommune": "commune"
+        })
 
-                # Normalize columns
-                gdf.columns = gdf.columns.str.lower().str.strip()
+        # Geometry validation
+        gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-                # Geometry validation
-                gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+        # Ensure population fields exist
+        for col in ["pop_se", "pop_se_ct"]:
+            if col not in gdf.columns:
+                gdf[col] = 0
 
-                # Store using file name (without extension)
-                layer_name = item["name"].replace(".geojson", "").lower()
-                gdfs[layer_name] = gdf
-        if not gdfs:
-            raise ValueError("No GeoJSON files found in the GitHub folder.")
-        return gdfs
+        return gdf
+
     except Exception as e:
-        st.error("❌ Failed to load GeoJSON layers from GitHub")
+        st.error("❌ Unable to load SE.geojson from GitHub")
         st.exception(e)
         st.stop()
-# Load all layers at once
-gdfs = load_all_geojson(GITHUB_FOLDER_API)
+
+
+gdf = load_se_data(SE_URL)
+
+
+
 
 # =========================================================
 # SIDEBAR FILTERS
