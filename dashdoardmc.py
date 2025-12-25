@@ -56,7 +56,8 @@ else:
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
-SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
+# SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
+SE_URL ="https://github.com/Moccamara/web_mapping/blob/main/data/SE.geojson"
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
     try:
@@ -244,6 +245,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
