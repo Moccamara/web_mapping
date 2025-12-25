@@ -125,7 +125,7 @@ if st.session_state.user_role == "Admin":
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=18)
+m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=19)
 
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
@@ -199,8 +199,18 @@ with col_chart:
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
                 fig, ax = plt.subplots(figsize=(1, 1))
-                ax.pie([pts["Masculin"].sum(), pts["Feminin"].sum()], labels=["M", "F"], autopct="%1.1f%%")
-                st.pyplot(fig)
+wedges, texts, autotexts = ax.pie(
+    [pts["Masculin"].sum(), pts["Feminin"].sum()],
+    labels=["M", "F"],
+    autopct="%1.1f%%"
+)
+# Label size (M / F)
+plt.setp(texts, fontsize=10, fontweight="bold")
+
+# Percentage size (xx.x%)
+plt.setp(autotexts, fontsize=9)
+
+st.pyplot(fig)
 
 # =========================================================
 # FOOTER
@@ -210,6 +220,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
