@@ -28,13 +28,23 @@ if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
-    st.session_state.points_gdf = None
+    st.session_state.page = "Home"  # default page
 
 # =========================================================
-# LOGIN
+# LOGOUT FUNCTION
 # =========================================================
-if not st.session_state.auth_ok:
-    st.sidebar.header("🔐 Login")
+def logout():
+    st.session_state.auth_ok = False
+    st.session_state.username = None
+    st.session_state.user_role = None
+    st.session_state.page = "Home"
+    st.experimental_rerun()
+
+# =========================================================
+# HOME PAGE (Login)
+# =========================================================
+if not st.session_state.auth_ok or st.session_state.page == "Home":
+    st.sidebar.header("🔐 Login / Home")
     username = st.sidebar.selectbox("User", list(USERS.keys()))
     password = st.sidebar.text_input("Password", type="password")
     if st.sidebar.button("Login"):
@@ -42,12 +52,11 @@ if not st.session_state.auth_ok:
             st.session_state.auth_ok = True
             st.session_state.username = username
             st.session_state.user_role = USERS[username]["role"]
+            st.session_state.page = "Dashboard"
             st.experimental_rerun()
         else:
             st.sidebar.error("❌ Incorrect password")
     st.stop()
-
-st.sidebar.success(f"Logged in as {st.session_state.username} ({st.session_state.user_role})")
 
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
@@ -61,6 +70,7 @@ def load_se_data(url):
         gdf = gdf.set_crs(epsg=4326)
     else:
         gdf = gdf.to_crs(epsg=4326)
+
     gdf.columns = gdf.columns.str.lower().str.strip()
     gdf = gdf.rename(columns={
         "lregion": "region",
@@ -68,6 +78,7 @@ def load_se_data(url):
         "lcommune": "commune"
     })
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
     for col in ["region", "cercle", "commune", "idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
@@ -83,11 +94,16 @@ except Exception:
     st.stop()
 
 # =========================================================
+# SIDEBAR NAVIGATION
+# =========================================================
+st.sidebar.markdown(f"**Logged in as:** {st.session_state.username} ({st.session_state.user_role})")
+if st.sidebar.button("Logout"):
+    logout()
+
+# =========================================================
 # SIDEBAR FILTERS
 # =========================================================
-st.sidebar.image("logo/logo_wgv.png", use_container_width=True)
 st.sidebar.markdown("### 🗂️ Attribute Query")
-
 region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
 gdf_r = gdf[gdf["region"] == region]
 
@@ -99,7 +115,11 @@ gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
-gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
+
+gdf_idse = (
+    gdf_commune if idse_selected == "No filtre"
+    else gdf_commune[gdf_commune["idse_new"] == idse_selected]
+)
 
 # =========================================================
 # CSV UPLOAD (ADMIN ONLY)
@@ -118,22 +138,23 @@ if st.session_state.user_role == "Admin":
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
-            st.session_state.points_gdf = points_gdf
+            st.session_state["points_gdf"] = points_gdf
 
 # Load points for all users
-points_gdf = st.session_state.points_gdf
+points_gdf = st.session_state.get("points_gdf", None)
 
 # =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=19)
+m = folium.Map(location=[(miny + maxy)/2, (minx + maxx)/2], zoom_start=19)
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
     tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     name="Satellite",
     attr="Esri"
 ).add_to(m)
+
 m.fit_bounds([[miny, minx], [maxy, maxx]])
 
 folium.GeoJson(
@@ -143,11 +164,11 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
 
-if points_gdf is not None and not points_gdf.empty:
+if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
-            radius=4,
+            radius=3,
             color="red",
             fill=True,
             fill_opacity=0.8
@@ -160,14 +181,14 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 # LAYOUT
 # =========================================================
-col_map, col_chart = st.columns((3, 1), gap="small")
+col_map, col_chart = st.columns((3,1), gap="small")
 with col_map:
-    st_folium(m, height=450, use_container_width=True)
+    st_folium(m, height=500, use_container_width=True)
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        # Population chart
+        # Population Bar Chart
         st.subheader("📊 Population")
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
@@ -188,35 +209,26 @@ with col_chart:
                 x=alt.X("idse_new:N", title=None),
                 xOffset="Variable:N",
                 y=alt.Y("Population:Q", title=None),
-                color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
+                color=alt.Color(
+                    "Variable:N",
+                    legend=alt.Legend(orient="right", title="Type")
+                ),
                 tooltip=["idse_new", "Variable", "Population"]
             )
-            .properties(height=200)
+            .properties(height=150)
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # Sex Pie Chart (from CSV)
+        # Sex Pie Chart (from uploaded CSV)
         st.subheader("👥 Sex (M / F)")
-        if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
+        if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
                 values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
                 if sum(values) > 0:
-                    fig, ax = plt.subplots(figsize=(4, 4))
-                    ax.pie(
-                        values,
-                        labels=["M", "F"],
-                        autopct="%1.1f%%",
-                        startangle=90,
-                        colors=["skyblue", "pink"]
-                    )
+                    fig, ax = plt.subplots(figsize=(2,2))
+                    ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
                     st.pyplot(fig)
-                else:
-                    st.info("No sex data in selected SE.")
-            else:
-                st.info("No points inside selected SE.")
-        else:
-            st.info("Upload a CSV with 'Masculin' and 'Feminin' columns.")
 
 # =========================================================
 # FOOTER
