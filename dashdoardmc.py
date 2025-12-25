@@ -48,7 +48,8 @@ if not st.session_state.auth_ok:
             st.session_state.auth_ok = True
             st.session_state.username = username
             st.session_state.user_role = USERS[username]["role"]
-            st.stop()  # Stop execution so app refreshes safely
+            st.success(f"Logged in as {username}")
+            st.stop()  # Stops execution so Streamlit refreshes safely
         else:
             st.sidebar.error("❌ Incorrect password")
 
@@ -57,11 +58,11 @@ if not st.session_state.auth_ok:
 # -----------------------------
 if st.session_state.auth_ok:
     if st.sidebar.button("Logout"):
-        # Clear session state safely
         for key in ["auth_ok", "username", "user_role", "points_gdf", "page"]:
             if key in st.session_state:
                 del st.session_state[key]
-        st.stop()  # Stop execution and refresh app
+        st.experimental_rerun()  # Safe now because it’s inside a button callback
+
 
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
@@ -244,6 +245,7 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
