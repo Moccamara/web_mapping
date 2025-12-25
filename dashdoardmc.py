@@ -226,7 +226,7 @@ with col_chart:
                             autopct="%1.1f%%",
                             textprops={
                                 "fontsize": 5,
-                                "fontweight": "normal"
+                                # "fontweight": "normal"
                             }
                         )
                         st.pyplot(fig)
@@ -242,6 +242,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
