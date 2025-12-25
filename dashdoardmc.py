@@ -217,7 +217,7 @@ with col_chart:
                         ax.pie(
                             values,
                             labels=["M", "F"],
-                            autopct="%1.1f%",
+                            autopct="%1.1f%%",
                             textprops={
                                 "fontsize": 5,
                             }
