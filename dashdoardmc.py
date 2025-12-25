@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
-import requests
 
 # =========================================================
 # APP CONFIG
@@ -22,22 +21,44 @@ USERS = {
     "admin": {"password": "admin2025", "role": "Admin"},
     "customer": {"password": "cust2025", "role": "Customer"}
 }
-# =========================================================
-# SIMULATED AUTH (replace with your real auth system)
-# =========================================================
-if "user_role" not in st.session_state:
-    # st.session_state.user_role = "Customer"  # default
-
-st.sidebar.markdown("### 👤 User Role")
-role = st.sidebar.radio(
-    "Select role (demo)",
-    ["admin", "customer"],
-    index=0 if st.session_state.user_role == "admin" else 1
-)
-st.session_state.user_role = role
 
 # =========================================================
-# LOAD SE POLYGONS FROM GITHUB (RAW)
+# SESSION INIT
+# =========================================================
+if "auth_ok" not in st.session_state:
+    st.session_state.auth_ok = False
+    st.session_state.username = None
+    st.session_state.user_role = None
+
+# =========================================================
+# LOGIN (REPLACES ROLE RADIO)
+# =========================================================
+if not st.session_state.auth_ok:
+    st.sidebar.header("🔐 Login")
+
+    username = st.sidebar.selectbox(
+        "User",
+        list(USERS.keys())
+    )
+
+    password = st.sidebar.text_input(
+        "Password",
+        type="password"
+    )
+
+    if st.sidebar.button("Login"):
+        if password == USERS[username]["password"]:
+            st.session_state.auth_ok = True
+            st.session_state.username = username
+            st.session_state.user_role = USERS[username]["role"]
+            st.rerun()
+        else:
+            st.sidebar.error("❌ Incorrect password")
+
+    st.stop()
+
+# =========================================================
+# LOAD SE POLYGONS FROM GITHUB
 # =========================================================
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE.geojson"
 
@@ -45,26 +66,21 @@ SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE
 def load_se_data(url):
     gdf = gpd.read_file(url)
 
-    # CRS
     if gdf.crs is None:
         gdf = gdf.set_crs(epsg=4326)
     else:
         gdf = gdf.to_crs(epsg=4326)
 
-    # Normalize columns
     gdf.columns = gdf.columns.str.lower().str.strip()
 
-    # Rename fields
     gdf = gdf.rename(columns={
         "lregion": "region",
         "lcercle": "cercle",
         "lcommune": "commune"
     })
 
-    # Geometry cleaning
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-    # Required fields
     for col in ["region", "cercle", "commune", "idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
@@ -75,7 +91,6 @@ def load_se_data(url):
 
     return gdf
 
-# 🔴 THIS LINE WAS MISSING
 try:
     gdf = load_se_data(SE_URL)
 except Exception:
@@ -99,12 +114,17 @@ gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
-gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
+
+gdf_idse = (
+    gdf_commune if idse_selected == "No filtre"
+    else gdf_commune[gdf_commune["idse_new"] == idse_selected]
+)
 
 # =========================================================
-# CSV UPLOAD (POINTS) - Admin only
+# CSV UPLOAD (ADMIN ONLY – VISIBLE TO ALL)
 # =========================================================
 points_gdf = None
+
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Import CSV Points")
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -119,11 +139,20 @@ if st.session_state.user_role == "Admin":
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326"
             )
+            st.session_state["points_gdf"] = points_gdf
+
+# Load points for customers
+if "points_gdf" in st.session_state:
+    points_gdf = st.session_state["points_gdf"]
+
 # =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
-m = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=19)
+m = folium.Map(
+    location=[(miny + maxy) / 2, (minx + maxx) / 2],
+    zoom_start=19
+)
 
 folium.TileLayer("OpenStreetMap").add_to(m)
 folium.TileLayer(
@@ -131,13 +160,16 @@ folium.TileLayer(
     name="Satellite",
     attr="Esri"
 ).add_to(m)
+
 m.fit_bounds([[miny, minx], [maxy, maxx]])
+
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
     style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
+
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -147,6 +179,7 @@ if points_gdf is not None:
             fill=True,
             fill_opacity=0.8
         ).add_to(m)
+
 MeasureControl().add_to(m)
 Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
@@ -155,15 +188,14 @@ folium.LayerControl(collapsed=True).add_to(m)
 # LAYOUT
 # =========================================================
 col_map, col_chart = st.columns((3, 1), gap="small")
+
 with col_map:
     st_folium(m, height=450, use_container_width=True)
+
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        # ===============================
-        # Population bar chart
-        # ===============================
         st.subheader("📊 Population")
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
@@ -177,86 +209,27 @@ with col_chart:
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
         })
+
         chart = (
             alt.Chart(df_long)
             .mark_bar()
             .encode(
-                x=alt.X("idse_new:N", title=None),
+                x="idse_new:N",
                 xOffset="Variable:N",
-                y=alt.Y("Population:Q", title=None),
-                color=alt.Color(
-                    "Variable:N",
-                    legend=alt.Legend(orient="right", title="Type")
-                ),
+                y="Population:Q",
+                color="Variable:N",
                 tooltip=["idse_new", "Variable", "Population"]
             )
             .properties(height=130)
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # ===============================
-        # Sex pie chart (SAFE)
-        # ===============================
-        st.subheader("👥 Sex (M / F)")
-        try:
-            if (
-                points_gdf is not None
-                and {"Masculin", "Feminin"}.issubset(points_gdf.columns)
-            ):
-                pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-
-                if not pts.empty:
-                    values = [
-                        pts["Masculin"].sum(),
-                        pts["Feminin"].sum()
-                    ]
-                    if sum(values) > 0:
-                        fig, ax = plt.subplots(figsize=(1, 1))
-                        ax.pie(
-                            values,
-                            labels=["M", "F"],
-                            autopct="%1.1f%%",
-                            textprops={
-                                "fontsize": 5,
-                            }
-                        )
-                        st.pyplot(fig)
-        except Exception:
-            pass  # 🔇 no Streamlit error message
-
-
 # =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
 ---
-**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
+**Geospatial Enterprise Web Mapping**  
+Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
