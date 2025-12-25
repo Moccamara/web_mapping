@@ -172,22 +172,18 @@ with col_chart:
         # Population bar chart
         # ===============================
         st.subheader("📊 Population")
-
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
-
         df_long = df_long.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
             var_name="Variable",
             value_name="Population"
         )
-
         df_long["Variable"] = df_long["Variable"].replace({
             "pop_se": "Pop SE",
             "pop_se_ct": "Pop Actu"
         })
-
         chart = (
             alt.Chart(df_long)
             .mark_bar()
@@ -203,14 +199,12 @@ with col_chart:
             )
             .properties(height=130)
         )
-
         st.altair_chart(chart, use_container_width=True)
 
         # ===============================
         # Sex pie chart (SAFE)
         # ===============================
         st.subheader("👥 Sex (M / F)")
-
         try:
             if (
                 points_gdf is not None
@@ -223,7 +217,6 @@ with col_chart:
                         pts["Masculin"].sum(),
                         pts["Feminin"].sum()
                     ]
-
                     if sum(values) > 0:
                         fig, ax = plt.subplots(figsize=(1, 1))
 
@@ -232,11 +225,10 @@ with col_chart:
                             labels=["M", "F"],
                             autopct="%1.1f%%",
                             textprops={
-                                "fontsize": 9,
-                                "fontweight": "bold"
+                                "fontsize": 5,
+                                "fontweight": "normal"
                             }
                         )
-
                         st.pyplot(fig)
         except Exception:
             pass  # 🔇 no Streamlit error message
@@ -250,6 +242,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
