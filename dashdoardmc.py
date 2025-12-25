@@ -205,10 +205,10 @@ wedges, texts, autotexts = ax.pie(
     autopct="%1.1f%%"
 )
 # Label size (M / F)
-plt.setp(texts, fontsize=10, fontweight="bold")
+plt.setp(texts, fontsize=6, fontweight="bold")
 
 # Percentage size (xx.x%)
-plt.setp(autotexts, fontsize=9)
+plt.setp(autotexts, fontsize=5)
 
 st.pyplot(fig)
 
@@ -220,6 +220,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
