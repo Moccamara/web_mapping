@@ -25,14 +25,6 @@ USERS = {
 }
 
 # =========================================================
-# SESSION STATE INITIALIZATION
-# =========================================================
-if "auth_ok" not in st.session_state:
-    st.session_state.auth_ok = False
-    st.session_state.username = None
-    st.session_state.user_role = None
-
-# =========================================================
 # LOGIN (SELECT USER + PASSWORD)
 # =========================================================
 if not st.session_state.auth_ok:
@@ -301,3 +293,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
