@@ -198,17 +198,13 @@ with col_chart:
         if points_gdf is not None and {"Masculin", "Feminin"}.issubset(points_gdf.columns):
             pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
             if not pts.empty:
-                fig, ax = plt.subplots(figsize=(1, 1))
-wedges, texts, autotexts = ax.pie(
+                fig, ax = plt.subplots(figsize=(1.8, 1.8))
+ax.pie(
     [pts["Masculin"].sum(), pts["Feminin"].sum()],
     labels=["M", "F"],
-    autopct="%1.1f%%"
+    autopct="%1.1f%%",
+    textprops={"fontsize": 9, "fontweight": "bold"}
 )
-# Label size (M / F)
-plt.setp(texts, fontsize=6, fontweight="bold")
-
-# Percentage size (xx.x%)
-plt.setp(autotexts, fontsize=5)
 
 st.pyplot(fig)
 
@@ -220,6 +216,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
