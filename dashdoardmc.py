@@ -114,7 +114,7 @@ commune = st.sidebar.selectbox("Commune", sorted(gdf_c["commune"].dropna().uniqu
 gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
-idse_selected = st.sidebar.selectbox("Nunit_Geo", idse_list)
+idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
@@ -250,6 +250,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
