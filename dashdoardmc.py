@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
+import requests
 
 # =========================================================
 # APP CONFIG
@@ -55,33 +56,47 @@ else:
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
-SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
 
-try:
-    gdf = gpd.read_file(SE_URL).to_crs(epsg=4326)
-except Exception as e:
-    st.error("Unable to load SE.geojson from GitHub")
-    st.exception(e)
-    st.stop()
+GITHUB_FOLDER_API = "https://api.github.com/repos/Moccamara/web_mapping/contents/data"
+TARGET_CRS = "EPSG:4326"
 
-# Normalize column names
-gdf.columns = gdf.columns.str.lower().str.strip()
+@st.cache_data(show_spinner=False)
+def load_all_geojson(api_url):
+    """Load all GeoJSON files from a GitHub folder into a dict of GeoDataFrames."""
+    try:
+        response = requests.get(api_url, timeout=20)
+        response.raise_for_status()
 
-# Rename fields safely
-gdf = gdf.rename(columns={
-    "lregion": "region",
-    "lcercle": "cercle",
-    "lcommune": "commune",
-    "idse_new": "idse_new"
-})
+        gdfs = {}
 
-# Geometry validation
-gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+        for item in response.json():
+            if item["type"] == "file" and item["name"].lower().endswith(".geojson"):
+                gdf = gpd.read_file(item["download_url"])
 
-# Ensure population fields exist
-for col in ["pop_se", "pop_se_ct"]:
-    if col not in gdf.columns:
-        gdf[col] = 0
+                # CRS safety
+                if gdf.crs is None:
+                    gdf = gdf.set_crs(TARGET_CRS)
+                else:
+                    gdf = gdf.to_crs(TARGET_CRS)
+
+                # Normalize columns
+                gdf.columns = gdf.columns.str.lower().str.strip()
+
+                # Geometry validation
+                gdf = gdf[gdf.is_valid & ~gdf.is_empty]
+
+                # Store using file name (without extension)
+                layer_name = item["name"].replace(".geojson", "").lower()
+                gdfs[layer_name] = gdf
+        if not gdfs:
+            raise ValueError("No GeoJSON files found in the GitHub folder.")
+        return gdfs
+    except Exception as e:
+        st.error("❌ Failed to load GeoJSON layers from GitHub")
+        st.exception(e)
+        st.stop()
+# Load all layers at once
+gdfs = load_all_geojson(GITHUB_FOLDER_API)
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -233,8 +248,9 @@ with col_chart:
 st.markdown("""
 ---
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
-**CAMARA, PhD – Geomatics Engineering** © 2025
+**Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
