@@ -56,12 +56,7 @@ else:
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB (RAW)
 # =========================================================
-
-import geopandas as gpd
-import streamlit as st
-
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/main/data/SE.geojson"
-
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
     try:
@@ -90,19 +85,12 @@ def load_se_data(url):
         for col in ["pop_se", "pop_se_ct"]:
             if col not in gdf.columns:
                 gdf[col] = 0
-
         return gdf
-
     except Exception as e:
         st.error("❌ Unable to load SE.geojson from GitHub")
         st.exception(e)
         st.stop()
-
-
 gdf = load_se_data(SE_URL)
-
-
-
 
 # =========================================================
 # SIDEBAR FILTERS
@@ -256,6 +244,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
