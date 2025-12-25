@@ -35,12 +35,12 @@ if "auth_ok" not in st.session_state:
 # =========================================================
 # Sidebar: Logout
 if st.sidebar.button("Logout"):
-    # Clear session state
+    # Clear session state safely
     for key in ["auth_ok", "username", "user_role", "points_gdf", "page"]:
         if key in st.session_state:
             del st.session_state[key]
-    st.experimental_rerun()
-
+    # Rerun app safely
+    st.stop()
 
 # =========================================================
 # HOME PAGE (Login)
@@ -241,4 +241,5 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
