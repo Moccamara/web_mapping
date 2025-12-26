@@ -58,6 +58,11 @@ if not st.session_state.auth_ok or st.session_state.page == "Home":
             st.sidebar.error("❌ Incorrect password")
     st.stop()
 
+try:
+    st.rerun()
+except Exception:
+    pass
+
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
 # =========================================================
@@ -227,6 +232,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
