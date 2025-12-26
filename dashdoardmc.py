@@ -4,7 +4,9 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import MeasureControl, Draw
 import pandas as pd
+import altair as alt
 import matplotlib.pyplot as plt
+from shapely.geometry import Point
 
 # =========================================================
 # APP CONFIG
@@ -27,26 +29,23 @@ if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
-    st.session_state.csv_data = None  # Store uploaded CSV
 
 # =========================================================
-# LOGOUT
+# LOGOUT FUNCTION
 # =========================================================
 def logout():
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
-    st.session_state.csv_data = None
     st.rerun()
 
 # =========================================================
-# LOGIN
+# HOME / LOGIN
 # =========================================================
 if not st.session_state.auth_ok:
     st.sidebar.header("🔐 Login")
     username = st.sidebar.selectbox("User", list(USERS.keys()))
     password = st.sidebar.text_input("Password", type="password")
-
     if st.sidebar.button("Login"):
         if password == USERS[username]["password"]:
             st.session_state.auth_ok = True
@@ -58,144 +57,175 @@ if not st.session_state.auth_ok:
     st.stop()
 
 # =========================================================
-# LOAD GEOJSON
+# LOAD SE POLYGONS
 # =========================================================
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE.geojson"
 
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
     gdf = gpd.read_file(url)
-    gdf = gdf.to_crs(epsg=4326)
+    if gdf.crs is None:
+        gdf = gdf.set_crs(epsg=4326)
+    else:
+        gdf = gdf.to_crs(epsg=4326)
     gdf.columns = gdf.columns.str.lower().str.strip()
-    gdf = gdf.rename(columns={
-        "lregion": "region",
-        "lcercle": "cercle",
-        "lcommune": "commune"
-    })
+    gdf = gdf.rename(
+        columns={"lregion": "region", "lcercle": "cercle", "lcommune": "commune"}
+    )
+    gdf = gdf[gdf.is_valid & ~gdf.is_empty]
     for col in ["region", "cercle", "commune", "idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
-    return gdf[gdf.is_valid & ~gdf.is_empty]
+    for col in ["pop_se", "pop_se_ct"]:
+        if col not in gdf.columns:
+            gdf[col] = 0
+    return gdf
 
-gdf = load_se_data(SE_URL)
+try:
+    gdf = load_se_data(SE_URL)
+except Exception:
+    st.error("❌ Unable to load SE.geojson from GitHub")
+    st.stop()
 
 # =========================================================
 # SIDEBAR
 # =========================================================
 with st.sidebar:
-    st.markdown(f"**User:** {st.session_state.username} ({st.session_state.user_role})")
+    st.image("logo/logo_wgv.png", width=200)
+    st.markdown(f"**Logged in as:** {st.session_state.username} ({st.session_state.user_role})")
     if st.button("Logout"):
         logout()
 
 # =========================================================
 # FILTERS
 # =========================================================
+st.sidebar.markdown("### 🗂️ Attribute Query")
 region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
-gdf = gdf[gdf["region"] == region]
+gdf_r = gdf[gdf["region"] == region]
+cercle = st.sidebar.selectbox("Cercle", sorted(gdf_r["cercle"].dropna().unique()))
+gdf_c = gdf_r[gdf_r["cercle"] == cercle]
+commune = st.sidebar.selectbox("Commune", sorted(gdf_c["commune"].dropna().unique()))
+gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
-cercle = st.sidebar.selectbox("Cercle", sorted(gdf["cercle"].dropna().unique()))
-gdf = gdf[gdf["cercle"] == cercle]
-
-commune = st.sidebar.selectbox("Commune", sorted(gdf["commune"].dropna().unique()))
-gdf = gdf[gdf["commune"] == commune]
-
-idse_list = ["No filter"] + sorted(gdf["idse_new"].dropna().unique())
-idse_selected = st.sidebar.selectbox("Unit_Geo (SE)", idse_list)
-
-gdf_idse = gdf if idse_selected == "No filter" else gdf[gdf["idse_new"] == idse_selected]
+idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
+idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
+gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (Admin only)
+# CSV UPLOAD (ADMIN)
 # =========================================================
-points_gdf = None
 if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 📥 Upload CSV")
-    csv_file = st.sidebar.file_uploader("CSV (LAT, LON, Masculin, Feminin)", type="csv")
-
+    st.sidebar.markdown("### 📥 Upload CSV Points")
+    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
     if csv_file:
-        df = pd.read_csv(csv_file).dropna(subset=["LAT", "LON"])
-        points_gdf = gpd.GeoDataFrame(
-            df,
-            geometry=gpd.points_from_xy(df["LON"], df["LAT"]),
-            crs="EPSG:4326"
-        )
-        st.session_state.csv_data = points_gdf
+        df_csv = pd.read_csv(csv_file)
+        if {"LAT", "LON"}.issubset(df_csv.columns):
+            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+            df_csv = df_csv.dropna(subset=["LAT", "LON"])
+            points_gdf = gpd.GeoDataFrame(
+                df_csv,
+                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+                crs="EPSG:4326",
+            )
+            st.session_state["points_gdf"] = points_gdf
+
+points_gdf = st.session_state.get("points_gdf")
 
 # =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
 m = folium.Map(location=[(miny + maxy)/2, (minx + maxx)/2], zoom_start=18)
-
+folium.TileLayer("OpenStreetMap").add_to(m)
+folium.TileLayer(
+    tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    name="Satellite",
+    attr="Esri",
+).add_to(m)
+m.fit_bounds([[miny, minx], [maxy, maxx]])
 folium.GeoJson(
     gdf_idse,
-    style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
-    tooltip=folium.GeoJsonTooltip(fields=["idse_new"])
+    name="IDSE",
+    style_function=lambda x: {"color":"blue","weight":2,"fillOpacity":0.15},
+    tooltip=folium.GeoJsonTooltip(fields=["idse_new","pop_se","pop_se_ct"]),
 ).add_to(m)
 
-if points_gdf is not None:
-    for _, r in points_gdf.iterrows():
+if filtered_points is not None:
+    for _, r in filtered_points.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
             radius=3,
             color="red",
-            fill=True
+            fill=True,
+            fill_opacity=0.8
         ).add_to(m)
 
 MeasureControl().add_to(m)
 Draw(export=True).add_to(m)
+folium.LayerControl(collapsed=True).add_to(m)
 
 # =========================================================
 # LAYOUT
 # =========================================================
-col_map, col_stats = st.columns((3, 1))
 
+col_map, col_chart = st.columns((3,1), gap="small")
 with col_map:
     st_folium(m, height=500, use_container_width=True)
-
-with col_stats:
-    st.subheader("Sex Distribution (M / F)")
-
-    if points_gdf is None:
-        st.warning("Upload CSV file to see pie chart.")
-    elif idse_selected == "No filter":
-        st.warning("Select a SE (Unit_Geo) to view pie chart.")
+with col_chart:
+    if idse_selected == "No filtre":
+        st.info("Select SE.")
     else:
-        # Filter points inside selected SE
-        points_gdf = st.session_state.csv_data
-        points_gdf = points_gdf.to_crs(gdf_idse.crs)
-        inside = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+        # Population Bar Chart
+        st.subheader("📊 Population")
+        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
+        df_long["idse_new"] = df_long["idse_new"].astype(str)
+        df_long = df_long.melt(
+            id_vars="idse_new",
+            value_vars=["pop_se", "pop_se_ct"],
+            var_name="Variable",
+            value_name="Population"
+        )
+        df_long["Variable"] = df_long["Variable"].replace({
+            "pop_se": "Pop SE",
+            "pop_se_ct": "Pop Actu"
+        })
+        chart = (
+            alt.Chart(df_long)
+            .mark_bar()
+            .encode(
+                x=alt.X("idse_new:N", title=None),
+                xOffset="Variable:N",
+                y=alt.Y("Population:Q", title=None),
+                color=alt.Color(
+                    "Variable:N",
+                    legend=alt.Legend(orient="right", title="Type")
+                ),
+                tooltip=["idse_new", "Variable", "Population"]
+            )
+            .properties(height=150)
+        )
+        st.altair_chart(chart, use_container_width=True)
 
-        if inside.empty:
-            st.warning("No points inside the selected SE.")
-            m_total, f_total = 0, 0
-        else:
-            inside["Masculin"] = pd.to_numeric(inside.get("Masculin", 0), errors="coerce").fillna(0)
-            inside["Feminin"] = pd.to_numeric(inside.get("Feminin", 0), errors="coerce").fillna(0)
+        # Sex Pie Chart (from uploaded CSV)
+        st.subheader("👥 Sex (M / F)")
+        if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
+            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+            if not pts.empty:
+                values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
+                if sum(values) > 0:
+                    fig, ax = plt.subplots(figsize=(2,2))
+                    ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
+                    st.pyplot(fig)
 
-            m_total = int(inside["Masculin"].sum())
-            f_total = int(inside["Feminin"].sum())
-
-        # Render pie chart
-        fig, ax = plt.subplots(figsize=(3, 3))
-        if m_total + f_total > 0:
-            ax.pie([m_total, f_total], labels=["M", "F"], autopct="%1.1f%%", startangle=90)
-        else:
-            ax.pie([1], labels=["No data"], colors=["lightgrey"])
-        ax.axis("equal")
-        st.pyplot(fig)
-
-        st.markdown(f"""
-        - 👨 **M**: {m_total}  
-        - 👩 **F**: {f_total}  
-        - 👥 **Total**: {m_total + f_total}
-        """)
 
 # =========================================================
 # FOOTER
 # =========================================================
 st.markdown("""
 ---
-**Geospatial Enterprise Web Mapping**  
+**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
+
