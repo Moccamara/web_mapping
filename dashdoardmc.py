@@ -64,7 +64,6 @@ if not st.session_state.auth_ok or st.session_state.page == "Home":
 with st.sidebar:
     st.image("logo/logo_wgv.png", width=200)
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE.geojson"
-
 @st.cache_data(show_spinner=False)
 def load_se_data(url):
     gdf = gpd.read_file(url)
@@ -72,7 +71,6 @@ def load_se_data(url):
         gdf = gdf.set_crs(epsg=4326)
     else:
         gdf = gdf.to_crs(epsg=4326)
-
     gdf.columns = gdf.columns.str.lower().str.strip()
     gdf = gdf.rename(columns={
         "lregion": "region",
@@ -80,7 +78,6 @@ def load_se_data(url):
         "lcommune": "commune"
     })
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
-
     for col in ["region", "cercle", "commune", "idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
@@ -88,7 +85,6 @@ def load_se_data(url):
         if col not in gdf.columns:
             gdf[col] = 0
     return gdf
-
 try:
     gdf = load_se_data(SE_URL)
 except Exception:
@@ -108,16 +104,12 @@ if st.sidebar.button("Logout"):
 st.sidebar.markdown("### 🗂️ Attribute Query")
 region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
 gdf_r = gdf[gdf["region"] == region]
-
 cercle = st.sidebar.selectbox("Cercle", sorted(gdf_r["cercle"].dropna().unique()))
 gdf_c = gdf_r[gdf_r["cercle"] == cercle]
-
 commune = st.sidebar.selectbox("Commune", sorted(gdf_c["commune"].dropna().unique()))
 gdf_commune = gdf_c[gdf_c["commune"] == commune]
-
 idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
-
 gdf_idse = (
     gdf_commune if idse_selected == "No filtre"
     else gdf_commune[gdf_commune["idse_new"] == idse_selected]
@@ -141,7 +133,6 @@ if st.session_state.user_role == "Admin":
                 crs="EPSG:4326"
             )
             st.session_state["points_gdf"] = points_gdf
-
 # Load points for all users
 points_gdf = st.session_state.get("points_gdf", None)
 
@@ -156,16 +147,13 @@ folium.TileLayer(
     name="Satellite",
     attr="Esri"
 ).add_to(m)
-
 m.fit_bounds([[miny, minx], [maxy, maxx]])
-
 folium.GeoJson(
     gdf_idse,
     name="IDSE",
     style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
     tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
 ).add_to(m)
-
 if points_gdf is not None:
     for _, r in points_gdf.iterrows():
         folium.CircleMarker(
@@ -175,7 +163,6 @@ if points_gdf is not None:
             fill=True,
             fill_opacity=0.8
         ).add_to(m)
-
 MeasureControl().add_to(m)
 Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
@@ -237,10 +224,10 @@ with col_chart:
 # =========================================================
 st.markdown("""
 ---
-**Geospatial Enterprise Web Mapping**  
-Developed with Streamlit, Folium & GeoPandas  
+**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
