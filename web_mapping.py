@@ -196,9 +196,9 @@ with col_chart:
             .encode(
                 # x=alt.X("idse_new:N", title=None),
                 # xOffset="Variable:N",
-                y=alt.Y("Population:Q", title=None),
+                # y=alt.Y("Population:Q", title=None),
                 color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
-                tooltip=["idse_new","Variable","Population"]
+                # tooltip=["idse_new","Variable","Population"]
             )
             .properties(height=150)
         )
@@ -248,4 +248,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
