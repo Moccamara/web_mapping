@@ -217,37 +217,27 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 # LAYOUT
 # =========================================================
-col_map, col_chart = st.columns((3, 1), gap="small")
-
+col_map, col_chart = st.columns((3,1), gap="small")
 with col_map:
     st_folium(m, height=500, use_container_width=True)
-
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
+        # Population Bar Chart
         st.subheader("📊 Population")
-
-        df_long = gdf_idse[
-            ["idse_new", "pop_se", "pop_se_ct"]
-        ].copy()
-
+        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
-
         df_long = df_long.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
             var_name="Variable",
-            value_name="Population",
+            value_name="Population"
         )
-
-        df_long["Variable"] = df_long["Variable"].replace(
-            {
-                "pop_se": "Pop SE",
-                "pop_se_ct": "Pop Actu",
-            }
-        )
-
+        df_long["Variable"] = df_long["Variable"].replace({
+            "pop_se": "Pop SE",
+            "pop_se_ct": "Pop Actu"
+        })
         chart = (
             alt.Chart(df_long)
             .mark_bar()
@@ -257,26 +247,32 @@ with col_chart:
                 y=alt.Y("Population:Q", title=None),
                 color=alt.Color(
                     "Variable:N",
-                    legend=alt.Legend(
-                        orient="right", title="Type"
-                    ),
+                    legend=alt.Legend(orient="right", title="Type")
                 ),
-                tooltip=["idse_new", "Variable", "Population"],
+                tooltip=["idse_new", "Variable", "Population"]
             )
-            .properties(height=160)
+            .properties(height=150)
         )
-
         st.altair_chart(chart, use_container_width=True)
+
+        # Sex Pie Chart (from uploaded CSV)
+        st.subheader("👥 Sex (M / F)")
+        if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
+            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+            if not pts.empty:
+                values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
+                if sum(values) > 0:
+                    fig, ax = plt.subplots(figsize=(2,2))
+                    ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
+                    st.pyplot(fig)
 
 # =========================================================
 # FOOTER
 # =========================================================
-st.markdown(
-    """
+st.markdown("""
 ---
-**Geospatial Enterprise Web Mapping**  Developed with Streamlit, Folium & GeoPandas  
+**Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
-"""
-)
+
 
 
