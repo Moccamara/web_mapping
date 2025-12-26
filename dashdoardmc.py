@@ -135,17 +135,17 @@ points_gdf = st.session_state.get("points_gdf")
 # =========================================================
 # DYNAMIC CSV FILTERS
 # =========================================================
-filtered_points = points_gdf
-if points_gdf is not None:
-    st.sidebar.markdown("### 🔎 CSV Filters")
-    exclude_cols = {"geometry", "LAT", "LON", "lat", "lon"}
-    filter_cols = [
-        c for c in points_gdf.columns if c not in exclude_cols and points_gdf[c].dtype == "object" and points_gdf[c].nunique() <= 20
-    ]
-    for col in filter_cols:
-        options = sorted(points_gdf[col].dropna().unique())
-        selected = st.sidebar.multiselect(col, options, default=options)
-        filtered_points = filtered_points[filtered_points[col].isin(selected)]
+# filtered_points = points_gdf
+# if points_gdf is not None:
+#     st.sidebar.markdown("### 🔎 CSV Filters")
+#     exclude_cols = {"geometry", "LAT", "LON", "lat", "lon"}
+#     filter_cols = [
+#         c for c in points_gdf.columns if c not in exclude_cols and points_gdf[c].dtype == "object" and points_gdf[c].nunique() <= 20
+#     ]
+#     for col in filter_cols:
+#         options = sorted(points_gdf[col].dropna().unique())
+#         selected = st.sidebar.multiselect(col, options, default=options)
+#         filtered_points = filtered_points[filtered_points[col].isin(selected)]
 
 # =========================================================
 # MAP
@@ -238,3 +238,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
