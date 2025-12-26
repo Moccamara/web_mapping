@@ -180,29 +180,31 @@ with col_chart:
         st.info("Select SE.")
     else:
         # ----------------- Population Bar Chart -----------------
-        st.subheader("📊 Population")
-        df_long = gdf_idse[["idse_new","pop_se","pop_se_ct"]].copy()
-        df_long["idse_new"] = df_long["idse_new"].astype(str)
-        df_long = df_long.melt(
-            id_vars="idse_new",
-            value_vars=["pop_se","pop_se_ct"],
-            var_name="Variable",
-            value_name="Population"
-        )
-        df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
-        chart = (
-            alt.Chart(df_long)
-            .mark_bar()
-            .encode(
-                x=alt.X("idse_new:N", title=None),
-                xOffset="Variable:N",
-                y=alt.Y("Population:Q", title=None),
-                color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type", axis=alt.Axis(labelAngle=45)),
-                tooltip=["idse_new","Variable","Population"]
-            )
-            .properties(height=150)
-        )
-        st.altair_chart(chart, use_container_width=True)
+       st.subheader("📊 Population")
+df_long = gdf_idse[["idse_new","pop_se","pop_se_ct"]].copy()
+df_long["idse_new"] = df_long["idse_new"].astype(str)
+df_long = df_long.melt(
+    id_vars="idse_new",
+    value_vars=["pop_se","pop_se_ct"],
+    var_name="Variable",
+    value_name="Population"
+)
+df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
+
+chart = (
+    alt.Chart(df_long)
+    .mark_bar()
+    .encode(
+        x=alt.X("idse_new:N", title=None, axis=alt.Axis(labelAngle=45)),  # rotate x-axis labels
+        xOffset="Variable:N",
+        y=alt.Y("Population:Q", title=None),
+        color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
+        tooltip=["idse_new","Variable","Population"]
+    )
+    .properties(height=200)
+)
+
+st.altair_chart(chart, use_container_width=True)
 
         # ----------------- Sex Pie Chart -----------------
         st.subheader("👥 Sex (M / F)")
@@ -248,6 +250,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
