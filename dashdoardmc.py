@@ -133,21 +133,6 @@ if st.session_state.user_role == "Admin":
 points_gdf = st.session_state.get("points_gdf")
 
 # =========================================================
-# DYNAMIC CSV FILTERS
-# =========================================================
-# filtered_points = points_gdf
-# if points_gdf is not None:
-#     st.sidebar.markdown("### 🔎 CSV Filters")
-#     exclude_cols = {"geometry", "LAT", "LON", "lat", "lon"}
-#     filter_cols = [
-#         c for c in points_gdf.columns if c not in exclude_cols and points_gdf[c].dtype == "object" and points_gdf[c].nunique() <= 20
-#     ]
-#     for col in filter_cols:
-#         options = sorted(points_gdf[col].dropna().unique())
-#         selected = st.sidebar.multiselect(col, options, default=options)
-#         filtered_points = filtered_points[filtered_points[col].isin(selected)]
-
-# =========================================================
 # MAP
 # =========================================================
 minx, miny, maxx, maxy = gdf_idse.total_bounds
@@ -183,19 +168,18 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 # LAYOUT
 # =========================================================
-col_map, col_chart = st.columns((3,1), gap="small")
-with col_map:
-    st_folium(m, height=500, use_container_width=True)
-
 with col_chart:
+    # ===============================
+    # Population Bar Chart
+    # ===============================
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        # Population Bar Chart
         st.subheader("📊 Population")
         df_long = gdf_idse[["idse_new","pop_se","pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
-        df_long = df_long.melt(id_vars="idse_new", value_vars=["pop_se","pop_se_ct"], var_name="Variable", value_name="Population")
+        df_long = df_long.melt(id_vars="idse_new", value_vars=["pop_se","pop_se_ct"], 
+                               var_name="Variable", value_name="Population")
         df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
         chart = (
             alt.Chart(df_long)
@@ -211,24 +195,34 @@ with col_chart:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # Pie Chart
-        st.subheader("👥 Sex (Filtered CSV)")
-        if filtered_points is None:
-            st.warning("No CSV uploaded.")
+    # ===============================
+    # Pie Chart (CSV points)
+    # ===============================
+    st.subheader("👥 Sex (CSV Data)")
+    if points_gdf is None:
+        st.warning("No CSV uploaded.")
+    else:
+        # Optional: only points inside selected IDSE
+        if idse_selected != "No filtre":
+            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
         else:
-            cols = {c.lower(): c for c in filtered_points.columns}
-            if "masculin" in cols and "feminin" in cols:
-                m = pd.to_numeric(filtered_points[cols["masculin"]], errors="coerce").sum()
-                f = pd.to_numeric(filtered_points[cols["feminin"]], errors="coerce").sum()
-                if m + f > 0:
-                    fig, ax = plt.subplots(figsize=(3,3))
-                    ax.pie([m,f], labels=["Male","Female"], autopct="%1.1f%%", startangle=90)
-                    ax.axis("equal")
-                    st.pyplot(fig)
-                else:
-                    st.warning("Filtered data contains no values.")
+            pts = points_gdf.copy()
+
+        # Check for required columns
+        cols = {c.lower(): c for c in pts.columns}
+        if "masculin" in cols and "feminin" in cols:
+            m = pd.to_numeric(pts[cols["masculin"]], errors="coerce").sum()
+            f = pd.to_numeric(pts[cols["feminin"]], errors="coerce").sum()
+            if m + f > 0:
+                fig, ax = plt.subplots(figsize=(3,3))
+                ax.pie([m,f], labels=["Male","Female"], autopct="%1.1f%%", startangle=90)
+                ax.axis("equal")
+                st.pyplot(fig)
             else:
-                st.warning("CSV must contain Masculin and Feminin columns.")
+                st.warning("Masculin/Feminin values are zero.")
+        else:
+            st.warning("CSV must contain 'Masculin' and 'Feminin' columns.")
+
 
 # =========================================================
 # FOOTER
@@ -238,4 +232,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
