@@ -210,30 +210,47 @@ with col_chart:
 if points_gdf is None:
     st.info("Upload CSV file to view Sex distribution.")
 else:
+    # --- Ensure CRS match ---
     points_gdf = points_gdf.to_crs(gdf_idse.crs)
-    points_gdf.columns = points_gdf.columns.str.strip()
     
+    # --- Normalize column names ---
+    points_gdf.columns = points_gdf.columns.str.strip().str.capitalize()
+
+    # --- Check required columns ---
     if {"Masculin","Feminin"}.issubset(points_gdf.columns):
+        
+        # --- Handle multi-polygons ---
         gdf_idse_simple = gdf_idse.explode(ignore_index=True)
-        pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
 
-        st.write("Points inside SE:", len(pts_inside))  # debug line
+        # --- Spatial join with 'intersects' predicate ---
+        try:
+            pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
+        except Exception as e:
+            st.error(f"Spatial join failed: {e}")
+            pts_inside = gpd.GeoDataFrame(columns=points_gdf.columns)
 
+        # --- Debug info ---
+        st.write("Total points in CSV:", len(points_gdf))
+        st.write("Points inside selected SE:", len(pts_inside))
+
+        # --- Calculate totals ---
         if pts_inside.empty:
-            st.warning("No points inside the selected SE.")
             m_total, f_total = 0, 0
+            st.warning("No points found inside the selected SE.")
         else:
             pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
             pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
             m_total = int(pts_inside["Masculin"].sum())
             f_total = int(pts_inside["Feminin"].sum())
 
+        # --- Display totals ---
         st.markdown(f"""
         - 👨 **M**: {m_total}  
         - 👩 **F**: {f_total}  
         - 👥 **Total**: {m_total + f_total}
         """)
 
+        # --- Pie chart ---
         fig, ax = plt.subplots(figsize=(3,3))
         if m_total + f_total > 0:
             ax.pie([m_total,f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
@@ -241,8 +258,10 @@ else:
             ax.pie([1], labels=["No data"], colors=["lightgrey"])
         ax.axis("equal")
         st.pyplot(fig)
+        
     else:
         st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
+
 
 
 # =========================================================
@@ -253,4 +272,5 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
