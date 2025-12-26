@@ -4,7 +4,6 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import MeasureControl, Draw
 import pandas as pd
-import altair as alt
 import matplotlib.pyplot as plt
 
 # =========================================================
@@ -76,9 +75,6 @@ def load_se_data(url):
     for col in ["region", "cercle", "commune", "idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
-    for col in ["pop_se", "pop_se_ct"]:
-        if col not in gdf.columns:
-            gdf[col] = 0
     return gdf[gdf.is_valid & ~gdf.is_empty]
 
 gdf = load_se_data(SE_URL)
@@ -111,6 +107,7 @@ gdf_idse = gdf if idse_selected == "No filter" else gdf[gdf["idse_new"] == idse_
 # =========================================================
 # CSV UPLOAD (Admin only)
 # =========================================================
+points_gdf = None
 if st.session_state.user_role == "Admin":
     st.sidebar.markdown("### 📥 Upload CSV")
     csv_file = st.sidebar.file_uploader("CSV (LAT, LON, Masculin, Feminin)", type="csv")
@@ -123,8 +120,6 @@ if st.session_state.user_role == "Admin":
             crs="EPSG:4326"
         )
         st.session_state.csv_data = points_gdf
-else:
-    points_gdf = None
 
 # =========================================================
 # MAP
@@ -135,7 +130,7 @@ m = folium.Map(location=[(miny + maxy)/2, (minx + maxx)/2], zoom_start=18)
 folium.GeoJson(
     gdf_idse,
     style_function=lambda x: {"color": "blue", "weight": 2, "fillOpacity": 0.15},
-    tooltip=folium.GeoJsonTooltip(fields=["idse_new", "pop_se", "pop_se_ct"])
+    tooltip=folium.GeoJsonTooltip(fields=["idse_new"])
 ).add_to(m)
 
 if points_gdf is not None:
@@ -159,81 +154,42 @@ with col_map:
     st_folium(m, height=500, use_container_width=True)
 
 with col_stats:
-    # ---------------- BAR CHART ----------------
-    if idse_selected != "No filter":
-        df_bar = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].melt(
-            id_vars="idse_new",
-            var_name="Type",
-            value_name="Population"
-        )
-        df_bar["Type"] = df_bar["Type"].replace({
-            "pop_se": "Pop SE",
-            "pop_se_ct": "Pop Actu"
-        })
-        st.altair_chart(
-            alt.Chart(df_bar)
-            .mark_bar()
-            .encode(
-                x="Type:N",
-                y="Population:Q",
-                color="Type:N"
-            )
-            .properties(height=150),
-            use_container_width=True
-        )
+    st.subheader("Sex Distribution (M / F)")
 
-    # ---------------- PIE CHART ----------------
-    st.subheader("Sex (M / F)")
-
-    if st.session_state.user_role == "Admin":
-        points_gdf = st.session_state.csv_data
-        if points_gdf is None:
-            st.warning("Upload CSV file.")
-        else:
-            points_gdf = points_gdf.to_crs(gdf_idse.crs)
-            inside = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-
-            if inside.empty:
-                st.warning("No points inside SE.")
-            else:
-                inside["Masculin"] = pd.to_numeric(inside["Masculin"], errors="coerce").fillna(0)
-                inside["Feminin"] = pd.to_numeric(inside["Feminin"], errors="coerce").fillna(0)
-
-                m_total = int(inside["Masculin"].sum())
-                f_total = int(inside["Feminin"].sum())
-
-                if m_total + f_total > 0:
-                    fig, ax = plt.subplots(figsize=(3, 3))
-                    ax.pie([m_total, f_total], labels=["M", "F"], autopct="%1.1f%%", startangle=90)
-                    ax.axis("equal")
-                    st.pyplot(fig)
-
-                    st.markdown(f"""
-                    - 👨 **M**: {m_total}  
-                    - 👩 **F**: {f_total}  
-                    - 👥 **Total**: {m_total + f_total}
-                    """)
-
+    if points_gdf is None:
+        st.warning("Upload CSV file to see pie chart.")
+    elif idse_selected == "No filter":
+        st.warning("Select a SE (Unit_Geo) to view pie chart.")
     else:
-        # ---------------- Aggregated stats for Customers ----------------
-        st.info("Aggregated SE stats (from GeoJSON)")
+        # Filter points inside selected SE
+        points_gdf = st.session_state.csv_data
+        points_gdf = points_gdf.to_crs(gdf_idse.crs)
+        inside = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
 
-        # Use pop_se / pop_se_ct as aggregated male/female for simplicity
-        # Adjust if your data has separate M/F counts
-        m_total = int(gdf_idse["pop_se"].sum())
-        f_total = int(gdf_idse["pop_se_ct"].sum())
+        if inside.empty:
+            st.warning("No points inside the selected SE.")
+            m_total, f_total = 0, 0
+        else:
+            inside["Masculin"] = pd.to_numeric(inside.get("Masculin", 0), errors="coerce").fillna(0)
+            inside["Feminin"] = pd.to_numeric(inside.get("Feminin", 0), errors="coerce").fillna(0)
 
+            m_total = int(inside["Masculin"].sum())
+            f_total = int(inside["Feminin"].sum())
+
+        # Render pie chart
+        fig, ax = plt.subplots(figsize=(3, 3))
         if m_total + f_total > 0:
-            fig, ax = plt.subplots(figsize=(3, 3))
             ax.pie([m_total, f_total], labels=["M", "F"], autopct="%1.1f%%", startangle=90)
-            ax.axis("equal")
-            st.pyplot(fig)
+        else:
+            ax.pie([1], labels=["No data"], colors=["lightgrey"])
+        ax.axis("equal")
+        st.pyplot(fig)
 
-            st.markdown(f"""
-            - 👨 **M**: {m_total}  
-            - 👩 **F**: {f_total}  
-            - 👥 **Total**: {m_total + f_total}
-            """)
+        st.markdown(f"""
+        - 👨 **M**: {m_total}  
+        - 👩 **F**: {f_total}  
+        - 👥 **Total**: {m_total + f_total}
+        """)
 
 # =========================================================
 # FOOTER
