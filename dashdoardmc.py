@@ -254,39 +254,36 @@ with col_chart:
     # ===============================
     # PIE CHART (CSV ONLY – ALWAYS)
     # ===============================
-    st.subheader("👥 Sex (CSV Data)")
+    st.subheader("👥 Sex (Filtered CSV)")
 
-    if points_gdf is None:
-        st.warning("No CSV uploaded.")
-    else:
-        # DEBUG (you MUST see this)
-        st.write("CSV columns:", list(points_gdf.columns))
-        st.write("CSV preview:", points_gdf.head())
+if filtered_points is None:
+    st.warning("No CSV uploaded.")
+else:
+    cols = {c.lower(): c for c in filtered_points.columns}
 
-        # normalize column names
-        cols = {c.lower(): c for c in points_gdf.columns}
+    if "masculin" in cols and "feminin" in cols:
+        m = pd.to_numeric(
+            filtered_points[cols["masculin"]], errors="coerce"
+        ).sum()
+        f = pd.to_numeric(
+            filtered_points[cols["feminin"]], errors="coerce"
+        ).sum()
 
-        if "masculin" in cols and "feminin" in cols:
-            m = pd.to_numeric(points_gdf[cols["masculin"]], errors="coerce").sum()
-            f = pd.to_numeric(points_gdf[cols["feminin"]], errors="coerce").sum()
-
-            st.write("Male sum:", m)
-            st.write("Female sum:", f)
-
-            if m + f > 0:
-                fig, ax = plt.subplots(figsize=(3, 3))
-                ax.pie(
-                    [m, f],
-                    labels=["Male", "Female"],
-                    autopct="%1.1f%%",
-                    startangle=90,
-                )
-                ax.axis("equal")
-                st.pyplot(fig)
-            else:
-                st.error("Masculin/Feminin values are zero.")
+        if m + f > 0:
+            fig, ax = plt.subplots(figsize=(3, 3))
+            ax.pie(
+                [m, f],
+                labels=["Male", "Female"],
+                autopct="%1.1f%%",
+                startangle=90,
+            )
+            ax.axis("equal")
+            st.pyplot(fig)
         else:
-            st.error("CSV must contain 'Masculin' and 'Feminin' columns.")
+            st.warning("Filtered data contains no values.")
+    else:
+        st.warning("CSV must contain Masculin and Feminin columns.")
+
 
 
 
@@ -298,6 +295,7 @@ st.markdown("""
 ---
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
+
 
 
 
