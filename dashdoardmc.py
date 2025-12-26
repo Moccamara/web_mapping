@@ -61,6 +61,8 @@ if not st.session_state.auth_ok or st.session_state.page == "Home":
 # =========================================================
 # LOAD SE POLYGONS FROM GITHUB
 # =========================================================
+with st.sidebar:
+    st.image("logo/logo_wgv.png", width=200)
 SE_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/SE.geojson"
 
 @st.cache_data(show_spinner=False)
@@ -239,3 +241,4 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
