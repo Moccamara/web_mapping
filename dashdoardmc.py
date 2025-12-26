@@ -38,7 +38,7 @@ def logout():
     st.session_state.username = None
     st.session_state.user_role = None
     st.session_state.page = "Home"
-    st.experimental_rerun()
+    # st.experimental_rerun()
 
 # =========================================================
 # HOME PAGE (Login)
@@ -241,4 +241,5 @@ st.markdown("""
 Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
