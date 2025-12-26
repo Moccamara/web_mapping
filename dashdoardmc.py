@@ -255,16 +255,40 @@ with col_chart:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # Sex Pie Chart (from uploaded CSV)
+       # =========================================================
+# Sex Pie Chart (from uploaded CSV ONLY)
+# =========================================================
 st.subheader("👥 Sex (M / F)")
-if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
-    pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-    if not pts.empty:
-        values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
-        if sum(values) > 0:
-            fig, ax = plt.subplots(figsize=(2,2))
-            ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
+
+if points_gdf is None:
+    st.info("Upload a CSV file with sex data to display the pie chart.")
+else:
+    # Normalize column names
+    cols = {c.lower(): c for c in points_gdf.columns}
+
+    if "masculin" in cols and "feminin" in cols:
+        m_col = cols["masculin"]
+        f_col = cols["feminin"]
+
+        m_val = pd.to_numeric(points_gdf[m_col], errors="coerce").sum()
+        f_val = pd.to_numeric(points_gdf[f_col], errors="coerce").sum()
+
+        if m_val + f_val > 0:
+            fig, ax = plt.subplots(figsize=(3, 3))
+            ax.pie(
+                [m_val, f_val],
+                labels=["Male", "Female"],
+                autopct="%1.1f%%",
+                startangle=90,
+                textprops={"fontsize": 9},
+            )
+            ax.axis("equal")
             st.pyplot(fig)
+        else:
+            st.warning("Sex columns found, but values are empty or zero.")
+    else:
+        st.warning("CSV must contain 'Masculin' and 'Feminin' columns.")
+
 
 
 # =========================================================
@@ -274,6 +298,7 @@ st.markdown("""
 ---
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
+
 
 
 
