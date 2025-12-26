@@ -256,15 +256,16 @@ with col_chart:
         st.altair_chart(chart, use_container_width=True)
 
         # Sex Pie Chart (from uploaded CSV)
-        st.subheader("👥 Sex (M / F)")
-        if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
-            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-            if not pts.empty:
-                values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
-                if sum(values) > 0:
-                    fig, ax = plt.subplots(figsize=(2,2))
-                    ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
-                    st.pyplot(fig)
+st.subheader("👥 Sex (M / F)")
+if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
+    pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+    if not pts.empty:
+        values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
+        if sum(values) > 0:
+            fig, ax = plt.subplots(figsize=(2,2))
+            ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
+            st.pyplot(fig)
+
 
 # =========================================================
 # FOOTER
@@ -273,6 +274,7 @@ st.markdown("""
 ---
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
+
 
 
 
