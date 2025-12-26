@@ -206,39 +206,44 @@ with col_chart:
 
         # ----------------- Sex Pie Chart -----------------
         st.subheader("👥 Sex (M / F)")
-        if points_gdf is None:
-            st.info("Upload CSV file to view Sex distribution.")
+
+if points_gdf is None:
+    st.info("Upload CSV file to view Sex distribution.")
+else:
+    points_gdf = points_gdf.to_crs(gdf_idse.crs)
+    points_gdf.columns = points_gdf.columns.str.strip()
+    
+    if {"Masculin","Feminin"}.issubset(points_gdf.columns):
+        gdf_idse_simple = gdf_idse.explode(ignore_index=True)
+        pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
+
+        st.write("Points inside SE:", len(pts_inside))  # debug line
+
+        if pts_inside.empty:
+            st.warning("No points inside the selected SE.")
+            m_total, f_total = 0, 0
         else:
-            points_gdf.columns = points_gdf.columns.str.strip()
-            if {"Masculin","Feminin"}.issubset(points_gdf.columns):
-                gdf_idse_simple = gdf_idse.explode(ignore_index=True)
-                pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
-                if pts_inside.empty:
-                    st.warning("No points inside the selected SE.")
-                    m_total, f_total = 0, 0
-                else:
-                    pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
-                    pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
-                    m_total = int(pts_inside["Masculin"].sum())
-                    f_total = int(pts_inside["Feminin"].sum())
+            pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
+            pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
+            m_total = int(pts_inside["Masculin"].sum())
+            f_total = int(pts_inside["Feminin"].sum())
 
-                # Totals
-                st.markdown(f"""
-                - 👨 **M**: {m_total}  
-                - 👩 **F**: {f_total}  
-                - 👥 **Total**: {m_total + f_total}
-                """)
+        st.markdown(f"""
+        - 👨 **M**: {m_total}  
+        - 👩 **F**: {f_total}  
+        - 👥 **Total**: {m_total + f_total}
+        """)
 
-                # Pie chart
-                fig, ax = plt.subplots(figsize=(3,3))
-                if m_total + f_total > 0:
-                    ax.pie([m_total,f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
-                else:
-                    ax.pie([1], labels=["No data"], colors=["lightgrey"])
-                ax.axis("equal")
-                st.pyplot(fig)
-            else:
-                st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
+        fig, ax = plt.subplots(figsize=(3,3))
+        if m_total + f_total > 0:
+            ax.pie([m_total,f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
+        else:
+            ax.pie([1], labels=["No data"], colors=["lightgrey"])
+        ax.axis("equal")
+        st.pyplot(fig)
+    else:
+        st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
+
 
 # =========================================================
 # FOOTER
@@ -248,3 +253,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
