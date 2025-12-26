@@ -28,7 +28,7 @@ if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
-    st.session_state.points_gdf = None  # Store uploaded CSV points
+    st.session_state.points_gdf = None  # store uploaded CSV points
 
 # =========================================================
 # LOGOUT
@@ -70,14 +70,12 @@ def load_se_data(url):
     else:
         gdf = gdf.to_crs(epsg=4326)
     gdf.columns = gdf.columns.str.lower().str.strip()
-    gdf = gdf.rename(
-        columns={"lregion": "region", "lcercle": "cercle", "lcommune": "commune"}
-    )
+    gdf = gdf.rename(columns={"lregion":"region","lcercle":"cercle","lcommune":"commune"})
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
-    for col in ["region", "cercle", "commune", "idse_new"]:
+    for col in ["region","cercle","commune","idse_new"]:
         if col not in gdf.columns:
             gdf[col] = ""
-    for col in ["pop_se", "pop_se_ct"]:
+    for col in ["pop_se","pop_se_ct"]:
         if col not in gdf.columns:
             gdf[col] = 0
     return gdf
@@ -120,14 +118,14 @@ if st.session_state.user_role == "Admin":
     csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
     if csv_file:
         df_csv = pd.read_csv(csv_file)
-        if {"LAT", "LON"}.issubset(df_csv.columns):
+        if {"LAT","LON"}.issubset(df_csv.columns):
             df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
             df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
-            df_csv = df_csv.dropna(subset=["LAT", "LON"])
+            df_csv = df_csv.dropna(subset=["LAT","LON"])
             points_gdf = gpd.GeoDataFrame(
                 df_csv,
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
-                crs="EPSG:4326",
+                crs="EPSG:4326"
             )
             st.session_state.points_gdf = points_gdf
 
@@ -149,11 +147,13 @@ folium.GeoJson(
     gdf_idse,
     name="IDSE",
     style_function=lambda x: {"color":"blue","weight":2,"fillOpacity":0.15},
-    tooltip=folium.GeoJsonTooltip(fields=["idse_new","pop_se","pop_se_ct"]),
+    tooltip=folium.GeoJsonTooltip(fields=["idse_new","pop_se","pop_se_ct"])
 ).add_to(m)
 
+# Add points to map if CSV uploaded
 if points_gdf is not None:
-    pts_inside_map = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+    points_gdf = points_gdf.to_crs(gdf_idse.crs)
+    pts_inside_map = gpd.sjoin(points_gdf, gdf_idse, predicate="intersects", how="inner")
     for _, r in pts_inside_map.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
@@ -181,18 +181,15 @@ with col_chart:
     else:
         # ----------------- Population Bar Chart -----------------
         st.subheader("📊 Population")
-        df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
+        df_long = gdf_idse[["idse_new","pop_se","pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
         df_long = df_long.melt(
             id_vars="idse_new",
-            value_vars=["pop_se", "pop_se_ct"],
+            value_vars=["pop_se","pop_se_ct"],
             var_name="Variable",
             value_name="Population"
         )
-        df_long["Variable"] = df_long["Variable"].replace({
-            "pop_se": "Pop SE",
-            "pop_se_ct": "Pop Actu"
-        })
+        df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
         chart = (
             alt.Chart(df_long)
             .mark_bar()
@@ -200,11 +197,8 @@ with col_chart:
                 x=alt.X("idse_new:N", title=None),
                 xOffset="Variable:N",
                 y=alt.Y("Population:Q", title=None),
-                color=alt.Color(
-                    "Variable:N",
-                    legend=alt.Legend(orient="right", title="Type")
-                ),
-                tooltip=["idse_new", "Variable", "Population"]
+                color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
+                tooltip=["idse_new","Variable","Population"]
             )
             .properties(height=150)
         )
@@ -214,35 +208,37 @@ with col_chart:
         st.subheader("👥 Sex (M / F)")
         if points_gdf is None:
             st.info("Upload CSV file to view Sex distribution.")
-        elif {"Masculin", "Feminin"}.issubset(points_gdf.columns):
-            # Filter points inside selected SE
-            pts_inside = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-            if pts_inside.empty:
-                st.warning("No points inside the selected SE.")
-                m_total, f_total = 0, 0
-            else:
-                pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
-                pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
-                m_total = int(pts_inside["Masculin"].sum())
-                f_total = int(pts_inside["Feminin"].sum())
-
-            # Display totals
-            st.markdown(f"""
-            - 👨 **M**: {m_total}  
-            - 👩 **F**: {f_total}  
-            - 👥 **Total**: {m_total + f_total}
-            """)
-
-            # Pie chart
-            fig, ax = plt.subplots(figsize=(3,3))
-            if m_total + f_total > 0:
-                ax.pie([m_total, f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
-            else:
-                ax.pie([1], labels=["No data"], colors=["lightgrey"])
-            ax.axis("equal")
-            st.pyplot(fig)
         else:
-            st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
+            points_gdf.columns = points_gdf.columns.str.strip()
+            if {"Masculin","Feminin"}.issubset(points_gdf.columns):
+                gdf_idse_simple = gdf_idse.explode(ignore_index=True)
+                pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
+                if pts_inside.empty:
+                    st.warning("No points inside the selected SE.")
+                    m_total, f_total = 0, 0
+                else:
+                    pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
+                    pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
+                    m_total = int(pts_inside["Masculin"].sum())
+                    f_total = int(pts_inside["Feminin"].sum())
+
+                # Totals
+                st.markdown(f"""
+                - 👨 **M**: {m_total}  
+                - 👩 **F**: {f_total}  
+                - 👥 **Total**: {m_total + f_total}
+                """)
+
+                # Pie chart
+                fig, ax = plt.subplots(figsize=(3,3))
+                if m_total + f_total > 0:
+                    ax.pie([m_total,f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
+                else:
+                    ax.pie([1], labels=["No data"], colors=["lightgrey"])
+                ax.axis("equal")
+                st.pyplot(fig)
+            else:
+                st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
 
 # =========================================================
 # FOOTER
