@@ -179,74 +179,73 @@ with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        # ----------------- Population Bar Chart -----------------
-       st.subheader("📊 Population")
-df_long = gdf_idse[["idse_new","pop_se","pop_se_ct"]].copy()
-df_long["idse_new"] = df_long["idse_new"].astype(str)
-df_long = df_long.melt(
-    id_vars="idse_new",
-    value_vars=["pop_se","pop_se_ct"],
-    var_name="Variable",
-    value_name="Population"
-)
-df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
-
-chart = (
-    alt.Chart(df_long)
-    .mark_bar()
-    .encode(
-        x=alt.X("idse_new:N", title=None, axis=alt.Axis(labelAngle=45)),  # rotate x-axis labels
-        xOffset="Variable:N",
-        y=alt.Y("Population:Q", title=None),
-        color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
-        tooltip=["idse_new","Variable","Population"]
-    )
-    .properties(height=200)
-)
-
-st.altair_chart(chart, use_container_width=True)
-
-       # ----------------- Sex Pie Chart -----------------
-st.subheader("👥 Sex (M / F)")
-
-if points_gdf is None:
-    st.info("Upload CSV file to view Sex distribution.")
-else:
-    points_gdf.columns = points_gdf.columns.str.strip()
-    if {"Masculin", "Feminin"}.issubset(points_gdf.columns):
-        # Make sure polygons are not multi-part
-        gdf_idse_simple = gdf_idse.explode(ignore_index=True)
-        
-        # Spatial join: points inside selected SE
-        pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
-        
-        if pts_inside.empty:
-            st.warning("No points inside the selected SE.")
-            m_total, f_total = 0, 0
-        else:
-            pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
-            pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
-            m_total = int(pts_inside["Masculin"].sum())
-            f_total = int(pts_inside["Feminin"].sum())
-
-        # Display totals
-        st.markdown(f"""
-- 👨 **M**: {m_total}  
-- 👩 **F**: {f_total}  
-- 👥 **Total**: {m_total + f_total}
-""")
-
-        # Pie chart
-        fig, ax = plt.subplots(figsize=(3,3))
-        if m_total + f_total > 0:
-            ax.pie([m_total, f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
-        else:
-            ax.pie([1], labels=["No data"], colors=["lightgrey"])
-        ax.axis("equal")
-        st.pyplot(fig)
-
+        # --- Population Bar Chart ---
+    st.subheader("📊 Population per SE")
+    if gdf_idse.empty:
+        st.info("Select an SE to view population data.")
     else:
-        st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
+        df_long = gdf_idse[["idse_new","pop_se","pop_se_ct"]].melt(
+            id_vars="idse_new",
+            value_vars=["pop_se","pop_se_ct"],
+            var_name="Variable",
+            value_name="Population"
+        )
+        df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
+
+        if df_long["Population"].sum()==0:
+            st.info("No population data available.")
+        else:
+            chart = (
+                alt.Chart(df_long)
+                .mark_bar()
+                .encode(
+                    x=alt.X("idse_new:N", title="SE"),
+                    y=alt.Y("Population:Q", title="Population"),
+                    color=alt.Color("Variable:N", title="Type"),
+                    tooltip=["idse_new","Variable","Population"]
+                )
+                .properties(height=200)
+            )
+            st.altair_chart(chart, use_container_width=True)
+
+    # --- Sex Pie Chart ---
+    st.subheader("👥 Sex (M / F)")
+    if points_gdf is None:
+        st.info("Upload CSV file to view Sex distribution.")
+    else:
+        points_gdf = points_gdf.to_crs(gdf_idse.crs)
+        points_gdf.columns = points_gdf.columns.str.strip()
+        if {"Masculin","Feminin"}.issubset(points_gdf.columns):
+            gdf_idse_simple = gdf_idse.explode(ignore_index=True)
+            pts_inside = gpd.sjoin(points_gdf, gdf_idse_simple, predicate="intersects", how="inner")
+
+            # --- Debug info ---
+            st.write("Points inside selected SE:", len(pts_inside))
+
+            if pts_inside.empty:
+                m_total,f_total=0,0
+                st.warning("No points inside the selected SE.")
+            else:
+                pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
+                pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
+                m_total = int(pts_inside["Masculin"].sum())
+                f_total = int(pts_inside["Feminin"].sum())
+
+            st.markdown(f"""
+            - 👨 **M**: {m_total}  
+            - 👩 **F**: {f_total}  
+            - 👥 **Total**: {m_total + f_total}
+            """)
+
+            fig, ax = plt.subplots(figsize=(3,3))
+            if m_total+f_total>0:
+                ax.pie([m_total,f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
+            else:
+                ax.pie([1], labels=["No data"], colors=["lightgrey"])
+            ax.axis("equal")
+            st.pyplot(fig)
+        else:
+            st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
 
 
 # =========================================================
