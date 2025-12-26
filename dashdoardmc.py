@@ -214,80 +214,80 @@ MeasureControl().add_to(m)
 Draw(export=True).add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 
-# =========================================================
-# LAYOUT
-# =========================================================
-col_map, col_chart = st.columns((3,1), gap="small")
-with col_map:
-    st_folium(m, height=500, use_container_width=True)
 with col_chart:
-    if idse_selected == "No filtre":
-        st.info("Select SE.")
-    else:
-        # Population Bar Chart
+
+    # ===============================
+    # Population Bar Chart (IDSE)
+    # ===============================
+    if idse_selected != "No filtre":
         st.subheader("📊 Population")
+
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
+
         df_long = df_long.melt(
             id_vars="idse_new",
             value_vars=["pop_se", "pop_se_ct"],
             var_name="Variable",
-            value_name="Population"
+            value_name="Population",
         )
-        df_long["Variable"] = df_long["Variable"].replace({
-            "pop_se": "Pop SE",
-            "pop_se_ct": "Pop Actu"
-        })
+
+        df_long["Variable"] = df_long["Variable"].replace(
+            {"pop_se": "Pop SE", "pop_se_ct": "Pop Actu"}
+        )
+
         chart = (
             alt.Chart(df_long)
             .mark_bar()
             .encode(
-                x=alt.X("idse_new:N", title=None),
+                x="idse_new:N",
+                y="Population:Q",
+                color="Variable:N",
                 xOffset="Variable:N",
-                y=alt.Y("Population:Q", title=None),
-                color=alt.Color(
-                    "Variable:N",
-                    legend=alt.Legend(orient="right", title="Type")
-                ),
-                tooltip=["idse_new", "Variable", "Population"]
+                tooltip=["Variable", "Population"],
             )
             .properties(height=150)
         )
+
         st.altair_chart(chart, use_container_width=True)
 
-       # =========================================================
-# Sex Pie Chart (from uploaded CSV ONLY)
-# =========================================================
-st.subheader("👥 Sex (M / F)")
+    # ===============================
+    # PIE CHART (CSV ONLY – ALWAYS)
+    # ===============================
+    st.subheader("👥 Sex (CSV Data)")
 
-if points_gdf is None:
-    st.info("Upload a CSV file with sex data to display the pie chart.")
-else:
-    # Normalize column names
-    cols = {c.lower(): c for c in points_gdf.columns}
-
-    if "masculin" in cols and "feminin" in cols:
-        m_col = cols["masculin"]
-        f_col = cols["feminin"]
-
-        m_val = pd.to_numeric(points_gdf[m_col], errors="coerce").sum()
-        f_val = pd.to_numeric(points_gdf[f_col], errors="coerce").sum()
-
-        if m_val + f_val > 0:
-            fig, ax = plt.subplots(figsize=(3, 3))
-            ax.pie(
-                [m_val, f_val],
-                labels=["Male", "Female"],
-                autopct="%1.1f%%",
-                startangle=90,
-                textprops={"fontsize": 9},
-            )
-            ax.axis("equal")
-            st.pyplot(fig)
-        else:
-            st.warning("Sex columns found, but values are empty or zero.")
+    if points_gdf is None:
+        st.warning("No CSV uploaded.")
     else:
-        st.warning("CSV must contain 'Masculin' and 'Feminin' columns.")
+        # DEBUG (you MUST see this)
+        st.write("CSV columns:", list(points_gdf.columns))
+        st.write("CSV preview:", points_gdf.head())
+
+        # normalize column names
+        cols = {c.lower(): c for c in points_gdf.columns}
+
+        if "masculin" in cols and "feminin" in cols:
+            m = pd.to_numeric(points_gdf[cols["masculin"]], errors="coerce").sum()
+            f = pd.to_numeric(points_gdf[cols["feminin"]], errors="coerce").sum()
+
+            st.write("Male sum:", m)
+            st.write("Female sum:", f)
+
+            if m + f > 0:
+                fig, ax = plt.subplots(figsize=(3, 3))
+                ax.pie(
+                    [m, f],
+                    labels=["Male", "Female"],
+                    autopct="%1.1f%%",
+                    startangle=90,
+                )
+                ax.axis("equal")
+                st.pyplot(fig)
+            else:
+                st.error("Masculin/Feminin values are zero.")
+        else:
+            st.error("CSV must contain 'Masculin' and 'Feminin' columns.")
+
 
 
 
@@ -298,6 +298,7 @@ st.markdown("""
 ---
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
+
 
 
 
