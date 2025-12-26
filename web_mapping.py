@@ -194,7 +194,7 @@ with col_chart:
             alt.Chart(df_long)
             .mark_bar()
             .encode(
-                x=alt.X("idse_new:N", title=None),
+                x=alt.X("idse_new:N", title=None, axis=alt.Axis(labelAngle=45)),
                 xOffset="Variable:N",
                 y=alt.Y("Population:Q", title=None),
                 color=alt.Color("Variable:N", legend=alt.Legend(orient="right", title="Type")),
@@ -248,3 +248,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
