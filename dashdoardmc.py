@@ -6,7 +6,6 @@ from folium.plugins import MeasureControl, Draw
 import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
-from shapely.geometry import Point
 
 # =========================================================
 # APP CONFIG
@@ -29,18 +28,20 @@ if "auth_ok" not in st.session_state:
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
+    st.session_state.points_gdf = None  # Store uploaded CSV points
 
 # =========================================================
-# LOGOUT FUNCTION
+# LOGOUT
 # =========================================================
 def logout():
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
+    st.session_state.points_gdf = None
     st.rerun()
 
 # =========================================================
-# HOME / LOGIN
+# LOGIN
 # =========================================================
 if not st.session_state.auth_ok:
     st.sidebar.header("🔐 Login")
@@ -128,9 +129,9 @@ if st.session_state.user_role == "Admin":
                 geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
                 crs="EPSG:4326",
             )
-            st.session_state["points_gdf"] = points_gdf
+            st.session_state.points_gdf = points_gdf
 
-points_gdf = st.session_state.get("points_gdf")
+points_gdf = st.session_state.points_gdf
 
 # =========================================================
 # MAP
@@ -151,8 +152,9 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new","pop_se","pop_se_ct"]),
 ).add_to(m)
 
-if filtered_points is not None:
-    for _, r in filtered_points.iterrows():
+if points_gdf is not None:
+    pts_inside_map = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+    for _, r in pts_inside_map.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
             radius=3,
@@ -168,15 +170,16 @@ folium.LayerControl(collapsed=True).add_to(m)
 # =========================================================
 # LAYOUT
 # =========================================================
-
 col_map, col_chart = st.columns((3,1), gap="small")
+
 with col_map:
     st_folium(m, height=500, use_container_width=True)
+
 with col_chart:
     if idse_selected == "No filtre":
         st.info("Select SE.")
     else:
-        # Population Bar Chart
+        # ----------------- Population Bar Chart -----------------
         st.subheader("📊 Population")
         df_long = gdf_idse[["idse_new", "pop_se", "pop_se_ct"]].copy()
         df_long["idse_new"] = df_long["idse_new"].astype(str)
@@ -207,17 +210,39 @@ with col_chart:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        # Sex Pie Chart (from uploaded CSV)
+        # ----------------- Sex Pie Chart -----------------
         st.subheader("👥 Sex (M / F)")
-        if points_gdf is not None and {"Masculin","Feminin"}.issubset(points_gdf.columns):
-            pts = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
-            if not pts.empty:
-                values = [pts["Masculin"].sum(), pts["Feminin"].sum()]
-                if sum(values) > 0:
-                    fig, ax = plt.subplots(figsize=(2,2))
-                    ax.pie(values, labels=["M","F"], autopct="%1.1f%%", textprops={"fontsize":8})
-                    st.pyplot(fig)
+        if points_gdf is None:
+            st.info("Upload CSV file to view Sex distribution.")
+        elif {"Masculin", "Feminin"}.issubset(points_gdf.columns):
+            # Filter points inside selected SE
+            pts_inside = gpd.sjoin(points_gdf, gdf_idse, predicate="within")
+            if pts_inside.empty:
+                st.warning("No points inside the selected SE.")
+                m_total, f_total = 0, 0
+            else:
+                pts_inside["Masculin"] = pd.to_numeric(pts_inside["Masculin"], errors="coerce").fillna(0)
+                pts_inside["Feminin"] = pd.to_numeric(pts_inside["Feminin"], errors="coerce").fillna(0)
+                m_total = int(pts_inside["Masculin"].sum())
+                f_total = int(pts_inside["Feminin"].sum())
 
+            # Display totals
+            st.markdown(f"""
+            - 👨 **M**: {m_total}  
+            - 👩 **F**: {f_total}  
+            - 👥 **Total**: {m_total + f_total}
+            """)
+
+            # Pie chart
+            fig, ax = plt.subplots(figsize=(3,3))
+            if m_total + f_total > 0:
+                ax.pie([m_total, f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
+            else:
+                ax.pie([1], labels=["No data"], colors=["lightgrey"])
+            ax.axis("equal")
+            st.pyplot(fig)
+        else:
+            st.warning("CSV must have 'Masculin' and 'Feminin' columns.")
 
 # =========================================================
 # FOOTER
@@ -227,5 +252,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
