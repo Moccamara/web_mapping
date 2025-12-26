@@ -191,7 +191,7 @@ with col_chart:
                     color=alt.Color("Variable:N", title="Type"),
                     tooltip=["idse_new","Variable","Population"]
                 )
-                .properties(height=200)
+                .properties(height=120)
             )
             st.altair_chart(chart, use_container_width=True)
 
@@ -242,3 +242,4 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping**  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
