@@ -29,15 +29,17 @@ if "auth_ok" not in st.session_state:
     st.session_state.username = None
     st.session_state.user_role = None
     st.session_state.points_gdf = None  # store uploaded CSV points
+    st.session_state.query_result = None
 
 # =========================================================
-# LOGOUT FUNCTION
+# LOGOUT
 # =========================================================
 def logout():
     st.session_state.auth_ok = False
     st.session_state.username = None
     st.session_state.user_role = None
     st.session_state.points_gdf = None
+    st.session_state.query_result = None
     st.rerun()
 
 # =========================================================
@@ -111,16 +113,8 @@ idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filter" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# SPATIAL QUERY
+# LOAD POINTS
 # =========================================================
-st.sidebar.markdown("### 🧭 Spatial Query")
-query_type = st.sidebar.selectbox(
-    "Select query type",
-    ["Intersects", "Within", "Contains"]
-)
-run_query = st.sidebar.button("Run Spatial Query")
-query_result = None
-# Load points
 POINTS_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/concession.csv"
 
 @st.cache_data(show_spinner=False)
@@ -142,19 +136,29 @@ def load_points_from_github(url):
 
 points_gdf = st.session_state.points_gdf if st.session_state.points_gdf is not None else load_points_from_github(POINTS_URL)
 
-if run_query and points_gdf is not None:
-    points_gdf = points_gdf.to_crs(gdf_idse.crs)
-    if query_type == "Intersects":
-        query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="intersects", how="inner")
-    elif query_type == "Within":
-        query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="within", how="inner")
-    elif query_type == "Contains":
-        query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="contains", how="inner")
-    
-    if query_result.empty:
-        st.sidebar.warning("No points match the spatial query.")
+# =========================================================
+# SPATIAL QUERY SIDEBAR
+# =========================================================
+st.sidebar.markdown("### 🧭 Spatial Query")
+query_type = st.sidebar.selectbox(
+    "Select query type",
+    ["Intersects", "Within", "Contains"]
+)
+if st.sidebar.button("Run Query"):
+    if points_gdf is not None:
+        points_gdf = points_gdf.to_crs(gdf_idse.crs)
+        if query_type == "Intersects":
+            st.session_state.query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="intersects", how="inner")
+        elif query_type == "Within":
+            st.session_state.query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="within", how="inner")
+        elif query_type == "Contains":
+            st.session_state.query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="contains", how="inner")
+        if st.session_state.query_result.empty:
+            st.sidebar.warning("No points match the query.")
+        else:
+            st.sidebar.success(f"{len(st.session_state.query_result)} points match the query")
     else:
-        st.sidebar.success(f"{len(query_result)} points match the query")
+        st.sidebar.error("No points available for the query.")
 
 # =========================================================
 # CSV UPLOAD (ADMIN ONLY)
@@ -201,9 +205,8 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new","pop_se","pop_se_ct"])
 ).add_to(m)
 
-# Add points to map: query results if available, else original points
-display_points = query_result if query_result is not None else points_gdf
-
+# Use query result if exists, else default points
+display_points = st.session_state.query_result if st.session_state.query_result is not None else points_gdf
 if display_points is not None:
     for _, r in display_points.iterrows():
         folium.CircleMarker(
