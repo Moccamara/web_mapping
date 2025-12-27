@@ -111,25 +111,30 @@ idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
 gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# CSV UPLOAD (ADMIN)
+# CSV UPLOAD (ADMIN ONLY – SHARED VIEW)
 # =========================================================
 if st.session_state.user_role == "Admin":
-    st.sidebar.markdown("### 📥 Upload CSV Points")
-    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-    if csv_file:
-        df_csv = pd.read_csv(csv_file)
-        if {"LAT","LON"}.issubset(df_csv.columns):
-            df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
-            df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
-            df_csv = df_csv.dropna(subset=["LAT","LON"])
-            points_gdf = gpd.GeoDataFrame(
-                df_csv,
-                geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
-                crs="EPSG:4326"
-            )
-            st.session_state.points_gdf = points_gdf
-
-points_gdf = st.session_state.points_gdf
+    st.sidebar.markdown("### 📥 Upload CSV Points (Admin)")
+    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"], key="admin_csv")
+    if csv_file is not None:
+        try:
+            df_csv = pd.read_csv(csv_file)
+            required_cols = {"LAT", "LON"}
+            if not required_cols.issubset(df_csv.columns):
+                st.sidebar.error("CSV must contain LAT and LON columns")
+            else:
+                df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+                df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+                df_csv = df_csv.dropna(subset=["LAT", "LON"])
+                points_gdf = gpd.GeoDataFrame(
+                    df_csv,
+                    geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+                    crs="EPSG:4326"
+                )
+                st.session_state.points_gdf = points_gdf
+                st.sidebar.success(f"✅ {len(points_gdf)} points loaded")
+        except Exception as e:
+            st.sidebar.error("Failed to read CSV file")
 
 # =========================================================
 # MAP
@@ -248,6 +253,7 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
+
 
 
 
