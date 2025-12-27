@@ -31,7 +31,7 @@ if "auth_ok" not in st.session_state:
     st.session_state.points_gdf = None  # store uploaded CSV points
 
 # =========================================================
-# LOGOUT
+# LOGOUT FUNCTION
 # =========================================================
 def logout():
     st.session_state.auth_ok = False
@@ -96,7 +96,7 @@ with st.sidebar:
         logout()
 
 # =========================================================
-# FILTERS
+# ATTRIBUTE FILTERS
 # =========================================================
 st.sidebar.markdown("### 🗂️ Attribute Query")
 region = st.sidebar.selectbox("Region", sorted(gdf["region"].dropna().unique()))
@@ -106,13 +106,21 @@ gdf_c = gdf_r[gdf_r["cercle"] == cercle]
 commune = st.sidebar.selectbox("Commune", sorted(gdf_c["commune"].dropna().unique()))
 gdf_commune = gdf_c[gdf_c["commune"] == commune]
 
-idse_list = ["No filtre"] + sorted(gdf_commune["idse_new"].dropna().unique())
+idse_list = ["No filter"] + sorted(gdf_commune["idse_new"].dropna().unique())
 idse_selected = st.sidebar.selectbox("Unit_Geo", idse_list)
-gdf_idse = gdf_commune if idse_selected == "No filtre" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
+gdf_idse = gdf_commune if idse_selected == "No filter" else gdf_commune[gdf_commune["idse_new"] == idse_selected]
 
 # =========================================================
-# LOAD POINTS FROM GITHUB (SHARED)
+# SPATIAL QUERY
 # =========================================================
+st.sidebar.markdown("### 🧭 Spatial Query")
+query_type = st.sidebar.selectbox(
+    "Select query type",
+    ["Intersects", "Within", "Contains"]
+)
+run_query = st.sidebar.button("Run Spatial Query")
+query_result = None
+# Load points
 POINTS_URL = "https://raw.githubusercontent.com/Moccamara/web_mapping/master/data/concession.csv"
 
 @st.cache_data(show_spinner=False)
@@ -131,17 +139,48 @@ def load_points_from_github(url):
         )
     except:
         return None
-# =========================================================
-# POINTS SOURCE LOGIC (ADMIN SESSION OR GITHUB)
-# =========================================================
-points_gdf = None
 
-if st.session_state.points_gdf is not None:
-    # Admin uploaded CSV (same session)
-    points_gdf = st.session_state.points_gdf
-else:
-    # Customer or new session → load from GitHub
-    points_gdf = load_points_from_github(POINTS_URL)
+points_gdf = st.session_state.points_gdf if st.session_state.points_gdf is not None else load_points_from_github(POINTS_URL)
+
+if run_query and points_gdf is not None:
+    points_gdf = points_gdf.to_crs(gdf_idse.crs)
+    if query_type == "Intersects":
+        query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="intersects", how="inner")
+    elif query_type == "Within":
+        query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="within", how="inner")
+    elif query_type == "Contains":
+        query_result = gpd.sjoin(points_gdf, gdf_idse, predicate="contains", how="inner")
+    
+    if query_result.empty:
+        st.sidebar.warning("No points match the spatial query.")
+    else:
+        st.sidebar.success(f"{len(query_result)} points match the query")
+
+# =========================================================
+# CSV UPLOAD (ADMIN ONLY)
+# =========================================================
+if st.session_state.user_role == "Admin":
+    st.sidebar.markdown("### 📥 Upload CSV Points (Admin)")
+    csv_file = st.sidebar.file_uploader("Upload CSV", type=["csv"], key="admin_csv")
+    if csv_file is not None:
+        try:
+            df_csv = pd.read_csv(csv_file)
+            required_cols = {"LAT", "LON"}
+            if not required_cols.issubset(df_csv.columns):
+                st.sidebar.error("CSV must contain LAT and LON columns")
+            else:
+                df_csv["LAT"] = pd.to_numeric(df_csv["LAT"], errors="coerce")
+                df_csv["LON"] = pd.to_numeric(df_csv["LON"], errors="coerce")
+                df_csv = df_csv.dropna(subset=["LAT", "LON"])
+                points_gdf = gpd.GeoDataFrame(
+                    df_csv,
+                    geometry=gpd.points_from_xy(df_csv["LON"], df_csv["LAT"]),
+                    crs="EPSG:4326"
+                )
+                st.session_state.points_gdf = points_gdf
+                st.sidebar.success(f"✅ {len(points_gdf)} points loaded")
+        except Exception as e:
+            st.sidebar.error("Failed to read CSV file")
 
 # =========================================================
 # MAP
@@ -162,11 +201,11 @@ folium.GeoJson(
     tooltip=folium.GeoJsonTooltip(fields=["idse_new","pop_se","pop_se_ct"])
 ).add_to(m)
 
-# Add points to map if CSV uploaded
-if points_gdf is not None:
-    points_gdf = points_gdf.to_crs(gdf_idse.crs)
-    pts_inside_map = gpd.sjoin(points_gdf, gdf_idse, predicate="intersects", how="inner")
-    for _, r in pts_inside_map.iterrows():
+# Add points to map: query results if available, else original points
+display_points = query_result if query_result is not None else points_gdf
+
+if display_points is not None:
+    for _, r in display_points.iterrows():
         folium.CircleMarker(
             location=[r.geometry.y, r.geometry.x],
             radius=3,
@@ -188,7 +227,7 @@ with col_map:
     st_folium(m, height=500, use_container_width=True)
 
 with col_chart:
-    if idse_selected == "No filtre":
+    if idse_selected == "No filter":
         st.info("Select SE.")
     else:
         # ----------------- Population Bar Chart -----------------
@@ -201,7 +240,7 @@ with col_chart:
             var_name="Variable",
             value_name="Population"
         )
-        df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Pop Actu"})
+        df_long["Variable"] = df_long["Variable"].replace({"pop_se":"Pop SE","pop_se_ct":"Current Pop"})
         chart = (
             alt.Chart(df_long)
             .mark_bar()
@@ -234,14 +273,12 @@ with col_chart:
                     m_total = int(pts_inside["Masculin"].sum())
                     f_total = int(pts_inside["Feminin"].sum())
 
-                # Totals
                 st.markdown(f"""
                 - 👨 **M**: {m_total}  
                 - 👩 **F**: {f_total}  
                 - 👥 **Total**: {m_total + f_total}
                 """)
 
-                # Pie chart
                 fig, ax = plt.subplots(figsize=(3,3))
                 if m_total + f_total > 0:
                     ax.pie([m_total,f_total], labels=["M","F"], autopct="%1.1f%%", startangle=90, textprops={"fontsize":10})
@@ -260,8 +297,3 @@ st.markdown("""
 **Geospatial Enterprise Web Mapping** Developed with Streamlit, Folium & GeoPandas  
 **Mahamadou CAMARA, PhD – Geomatics Engineering** © 2025
 """)
-
-
-
-
-
